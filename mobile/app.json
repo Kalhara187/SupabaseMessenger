@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "SQLRealtimeMessenger",
+    "slug": "sqlrealtimemessenger",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0B141A"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.sqlrealtime.messenger"
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-image-picker"
+    ],
+    "extra": {
+      "apiUrl": "http://10.83.57.105:5000"
+    }
+  }
+}
