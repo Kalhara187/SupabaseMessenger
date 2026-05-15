@@ -44,8 +44,12 @@ const supabaseRequest = async (path, options = {}) => {
     console.log(`[SUPABASE] Response data:`, result);
     return result;
   } catch (error) {
-    console.error('[SUPABASE] Request error:', error.message || error);
-    throw error;
+    // Provide more actionable logs for network/connectivity issues and rethrow a clear Error
+    console.error('[SUPABASE] Request error:', error && error.stack ? error.stack : error);
+    const message = error?.message || 'Supabase request failed';
+    const wrapped = new Error(`Supabase request failed: ${message}`);
+    wrapped.cause = error;
+    throw wrapped;
   }
 };
 

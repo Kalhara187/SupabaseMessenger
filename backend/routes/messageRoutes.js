@@ -19,13 +19,13 @@ router.post(
   '/',
   upload.single('media'),
   [
-    body('chatId').isInt({ min: 1 }),
+    body('chatId').notEmpty().isString(),
     body('messageType').optional().isIn(['text', 'image', 'video', 'voice', 'file']),
   ],
   validateRequest,
   createNewMessage
 );
-router.post('/seen', [body('chatId').isInt({ min: 1 })], validateRequest, seenMessage);
+router.post('/seen', [body('chatId').notEmpty().isString()], validateRequest, seenMessage);
 router.delete('/:id', deleteMessage);
 
 module.exports = router;

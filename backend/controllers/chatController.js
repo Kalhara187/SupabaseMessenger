@@ -6,134 +6,256 @@ const {
   findOrCreateDirectChat,
 } = require('../models/chatModel');
 
+/**
+ * Parse participant IDs from various formats (array, JSON string, etc.)
+ */
 const parseParticipantIds = (rawParticipantIds) => {
   if (Array.isArray(rawParticipantIds)) {
-    return rawParticipantIds;
+    return rawParticipantIds.filter(id => id);
   }
 
   if (typeof rawParticipantIds === 'string') {
-    return JSON.parse(rawParticipantIds || '[]');
+    try {
+      const parsed = JSON.parse(rawParticipantIds || '[]');
+      return Array.isArray(parsed) ? parsed.filter(id => id) : [];
+    } catch {
+      return [];
+    }
   }
 
   return [];
 };
 
-const serializeChat = async (chatId) => {
-  const chat = await getChatById(chatId);
-  if (!chat) {
-    return null;
-  }
-
-  const participants = await getChatParticipants(chatId);
-  return {
-    ...chat,
-    chatId: chat.id,
-    participants,
-  };
+/**
+ * Validate user ID format
+ */
+const isValidUserId = (userId) => {
+  if (!userId) return false;
+  const trimmed = String(userId).trim();
+  return trimmed.length > 0;
 };
 
+/**
+ * List all chats for the logged-in user
+ * GET /api/chats
+ */
 const listChats = async (req, res, next) => {
   try {
-    const chats = await getUserChats(req.user.id);
+    const userId = req.user.id;
+    console.log('[CHAT] listChats for user:', userId);
+
+    const chats = await getUserChats(userId);
+    
     const enriched = await Promise.all(
       chats.map(async (chat) => {
         const participants = await getChatParticipants(chat.id);
-        const otherParticipant = participants.find((participant) => participant.id !== req.user.id);
+        const otherParticipant = participants.find(p => String(p.id) !== String(userId));
 
         return {
-          ...chat,
+          id: chat.id,
           chatId: chat.id,
+          type: chat.type,
+          title: chat.title,
+          group_image: chat.group_image,
+          created_at: chat.created_at,
+          last_message: chat.last_message,
+          last_message_time: chat.last_message_time,
+          unread_count: chat.unread_count || 0,
           participants,
           display_name:
             chat.type === 'direct'
-              ? otherParticipant?.full_name || otherParticipant?.username || chat.title || `Chat ${chat.id}`
-              : chat.title || `Chat ${chat.id}`,
+              ? otherParticipant?.full_name || otherParticipant?.username || 'Conversation'
+              : chat.title || 'Group Chat',
         };
       })
     );
 
+    console.log('[CHAT] Returning', enriched.length, 'chats');
     return res.json(enriched);
   } catch (error) {
+    console.error('[CHAT] listChats error:', error.message);
     return next(error);
   }
 };
 
+/**
+ * Find existing or create new direct chat between two users
+ * GET /api/chats/find-or-create?user1=ID&user2=ID
+ */
 const findOrCreateChat = async (req, res, next) => {
   try {
-    const user1 = Number(req.query.user1 || req.user.id);
-    const user2 = Number(req.query.user2);
+    // Extract user IDs from query params
+    const user1 = req.query.user1 ? String(req.query.user1).trim() : null;
+    const user2 = req.query.user2 ? String(req.query.user2).trim() : null;
+    const currentUserId = String(req.user.id);
 
-    if (!Number.isInteger(user1) || !Number.isInteger(user2)) {
-      return res.status(400).json({ message: 'Both user1 and user2 are required' });
+    console.log('[CHAT] find-or-create request:', { user1, user2, currentUserId });
+
+    // VALIDATION: Check user1 is provided and valid
+    if (!isValidUserId(user1)) {
+      console.error('[CHAT] Invalid user1 provided:', user1);
+      return res.status(400).json({
+        message: 'user1 (first user ID) is required and must be a non-empty string',
+      });
     }
 
+    // VALIDATION: Check user2 is provided and valid
+    if (!isValidUserId(user2)) {
+      console.error('[CHAT] Invalid user2 provided:', user2);
+      return res.status(400).json({
+        message: 'user2 (second user ID) is required and must be a non-empty string',
+      });
+    }
+
+    // VALIDATION: Ensure users are different
     if (user1 === user2) {
-      return res.status(400).json({ message: 'A chat requires two different users' });
+      console.error('[CHAT] Self-chat attempt:', user1);
+      return res.status(400).json({
+        message: 'Cannot create a chat with the same user',
+      });
     }
 
-    if (req.user.id !== user1 && req.user.id !== user2) {
-      return res.status(403).json({ message: 'Forbidden' });
+    // VALIDATION: Ensure current user is one of the two participants
+    if (currentUserId !== user1 && currentUserId !== user2) {
+      console.error('[CHAT] Authorization violation:', { currentUserId, user1, user2 });
+      return res.status(403).json({
+        message: 'Forbidden: you can only create chats involving yourself',
+      });
     }
 
+    // BUSINESS LOGIC: Find or create the direct chat
+    console.log('[CHAT] Finding or creating direct chat between', user1, 'and', user2);
     const chat = await findOrCreateDirectChat(user1, user2);
+
     if (!chat) {
-      return res.status(500).json({ message: 'Unable to create chat' });
+      console.error('[CHAT] Failed to create/find chat');
+      return res.status(500).json({
+        message: 'Failed to create or retrieve chat',
+      });
     }
 
+    // RESPONSE: Fetch participants and return complete chat object
     const participants = await getChatParticipants(chat.id);
 
-    return res.json({
-      ...chat,
+    const response = {
+      id: chat.id,
       chatId: chat.id,
+      type: chat.type,
+      title: chat.title,
+      group_image: chat.group_image,
+      created_at: chat.created_at,
       participants,
-    });
+    };
+
+    console.log('[CHAT] Returning chat:', { chatId: chat.id, participantCount: participants.length });
+    return res.json(response);
   } catch (error) {
+    console.error('[CHAT] find-or-create error:', error.message);
+    console.error('[CHAT] Stack:', error.stack);
     return next(error);
   }
 };
 
+
+/**
+ * Create a new group chat
+ * POST /api/chats
+ */
 const createNewChat = async (req, res, next) => {
   try {
-    const { type = 'direct', title = null } = req.body;
-    const participantIds = parseParticipantIds(req.body.participantIds);
-    const mergedParticipants = Array.from(new Set([req.user.id, ...participantIds.map(Number)]));
+    const { type = 'direct', title = null, participantIds: rawParticipantIds } = req.body;
+    const currentUserId = String(req.user.id);
 
-    if (mergedParticipants.length < 2) {
-      return res.status(400).json({ message: 'A chat requires at least 2 participants' });
+    console.log('[CHAT] createNewChat request:', { type, title, hasFile: !!req.file });
+
+    // VALIDATION: Check chat type
+    if (!type || !['direct', 'group'].includes(type)) {
+      return res.status(400).json({
+        message: 'Chat type must be "direct" or "group"',
+      });
     }
 
+    // Parse and validate participant IDs
+    const participantIds = parseParticipantIds(rawParticipantIds);
+    const allParticipants = Array.from(
+      new Set([currentUserId, ...participantIds.map(String)])
+    ).filter(isValidUserId);
+
+    // VALIDATION: Ensure at least 2 participants
+    if (allParticipants.length < 2) {
+      return res.status(400).json({
+        message: 'A chat requires at least 2 participants',
+      });
+    }
+
+    // BUSINESS LOGIC: Direct chats use find-or-create
     if (type === 'direct') {
-      const chat = await findOrCreateDirectChat(mergedParticipants[0], mergedParticipants[1]);
+      if (allParticipants.length !== 2) {
+        return res.status(400).json({
+          message: 'Direct chats must have exactly 2 participants',
+        });
+      }
+
+      const [user1, user2] = allParticipants;
+      console.log('[CHAT] Creating/finding direct chat between', user1, 'and', user2);
+
+      const chat = await findOrCreateDirectChat(user1, user2);
       if (!chat) {
-        return res.status(500).json({ message: 'Unable to create chat' });
+        return res.status(500).json({
+          message: 'Failed to create or retrieve direct chat',
+        });
       }
 
       const participants = await getChatParticipants(chat.id);
-      return res.status(mergedParticipants.length === 2 ? 200 : 201).json({
-        ...chat,
+      return res.status(200).json({
+        id: chat.id,
         chatId: chat.id,
+        type: chat.type,
+        title: chat.title,
+        group_image: chat.group_image,
+        created_at: chat.created_at,
         participants,
       });
     }
 
-    const groupImage = req.file ? `/uploads/${req.file.filename}` : null;
+    // BUSINESS LOGIC: Group chats are always created new
+    if (type === 'group') {
+      if (!title || String(title).trim().length === 0) {
+        return res.status(400).json({
+          message: 'Group chats must have a title',
+        });
+      }
 
-    const chatId = await createChat(
-      { type, title, groupImage },
-      mergedParticipants
-    );
+      const groupImage = req.file ? `/uploads/${req.file.filename}` : null;
 
-    const participants = await getChatParticipants(chatId);
+      console.log('[CHAT] Creating new group chat:', { title, participantCount: allParticipants.length });
 
-    return res.status(201).json({
-      id: chatId,
-      chatId,
-      type,
-      title,
-      group_image: groupImage,
-      participants,
-    });
+      const chatId = await createChat(
+        { type: 'group', title: String(title).trim(), groupImage },
+        allParticipants
+      );
+
+      if (!chatId) {
+        return res.status(500).json({
+          message: 'Failed to create group chat',
+        });
+      }
+
+      const participants = await getChatParticipants(chatId);
+
+      return res.status(201).json({
+        id: chatId,
+        chatId,
+        type: 'group',
+        title: String(title).trim(),
+        group_image: groupImage,
+        created_at: new Date().toISOString(),
+        participants,
+      });
+    }
   } catch (error) {
+    console.error('[CHAT] createNewChat error:', error.message);
+    console.error('[CHAT] Stack:', error.stack);
     return next(error);
   }
 };

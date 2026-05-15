@@ -58,6 +58,12 @@ const getChatById = async (chatId) => {
 };
 
 const findDirectChatBetweenUsers = async (userA, userB) => {
+  // Normalize: ensure consistent user order (smaller ID first) to prevent duplicates
+  const userIds = [String(userA), String(userB)].sort();
+  const [user1, user2] = userIds;
+
+  console.log(`[CHAT] Finding direct chat between ${user1} and ${user2}`);
+
   const [rows] = await pool.execute(
     `SELECT
       c.id,
@@ -86,20 +92,49 @@ const findDirectChatBetweenUsers = async (userA, userB) => {
       )
     ORDER BY c.created_at DESC
     LIMIT 1`,
-    [userA, userA, userB, userA, userB]
+    [user1, user1, user2, user1, user2]
   );
 
-  return rows[0] || null;
+  const chat = rows[0] || null;
+  if (chat) {
+    console.log(`[CHAT] Found existing direct chat ${chat.id} between ${user1} and ${user2}`);
+  } else {
+    console.log(`[CHAT] No existing direct chat found between ${user1} and ${user2}`);
+  }
+  return chat;
 };
 
 const findOrCreateDirectChat = async (userA, userB) => {
-  const existing = await findDirectChatBetweenUsers(userA, userB);
+  // Validate inputs
+  const user1 = String(userA);
+  const user2 = String(userB);
+
+  if (!user1 || !user2) {
+    console.error('[CHAT] Invalid user IDs:', { user1, user2 });
+    throw new Error('Both user1 and user2 are required');
+  }
+
+  if (user1 === user2) {
+    console.error('[CHAT] Cannot create chat with same user:', user1);
+    throw new Error('Cannot create a chat with the same user');
+  }
+
+  console.log(`[CHAT] findOrCreateDirectChat called with users: ${user1}, ${user2}`);
+
+  const existing = await findDirectChatBetweenUsers(user1, user2);
   if (existing) {
+    console.log(`[CHAT] Returning existing chat ${existing.id}`);
     return existing;
   }
 
-  const chatId = await createChat({ type: 'direct' }, [userA, userB]);
-  return getChatById(chatId);
+  console.log(`[CHAT] Creating new direct chat between ${user1} and ${user2}`);
+  const chatId = await createChat({ type: 'direct' }, [user1, user2]);
+  const newChat = await getChatById(chatId);
+
+  if (newChat) {
+    console.log(`[CHAT] Created new chat ${newChat.id} successfully`);
+  }
+  return newChat;
 };
 
 const getUserChats = async (userId) => {
@@ -131,22 +166,41 @@ const getUserChats = async (userId) => {
 };
 
 const isUserInChat = async (chatId, userId) => {
-  const [rows] = await pool.execute(
-    'SELECT id FROM chat_participants WHERE chat_id = ? AND user_id = ? LIMIT 1',
-    [chatId, userId]
-  );
-  return Boolean(rows[0]);
+  console.log('[CHAT-MODEL] isUserInChat check:', { chatId, userId, chatIdType: typeof chatId, userIdType: typeof userId });
+
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id FROM chat_participants WHERE chat_id = ? AND user_id = ? LIMIT 1',
+      [chatId, userId]
+    );
+
+    const isInChat = Boolean(rows[0]);
+    console.log('[CHAT-MODEL] isUserInChat result:', isInChat);
+    return isInChat;
+  } catch (error) {
+    console.error('[CHAT-MODEL] Error checking if user in chat:', error.message);
+    throw error;
+  }
 };
 
 const getChatParticipants = async (chatId) => {
-  const [rows] = await pool.execute(
-    `SELECT u.id, u.full_name, u.username, u.profile_image, u.is_online
-     FROM chat_participants cp
-     INNER JOIN users u ON u.id = cp.user_id
-     WHERE cp.chat_id = ?`,
-    [chatId]
-  );
-  return rows;
+  console.log('[CHAT-MODEL] getChatParticipants called with:', { chatId, chatIdType: typeof chatId });
+
+  try {
+    const [rows] = await pool.execute(
+      `SELECT u.id, u.full_name, u.username, u.profile_image, u.is_online
+       FROM chat_participants cp
+       INNER JOIN users u ON u.id = cp.user_id
+       WHERE cp.chat_id = ?`,
+      [chatId]
+    );
+
+    console.log('[CHAT-MODEL] Found', rows.length, 'participants for chat', chatId);
+    return rows;
+  } catch (error) {
+    console.error('[CHAT-MODEL] Error fetching participants:', error.message);
+    throw error;
+  }
 };
 
 module.exports = {

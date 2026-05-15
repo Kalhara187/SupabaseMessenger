@@ -20,7 +20,7 @@ const tables = [
     name: 'users',
     sql: `
       CREATE TABLE IF NOT EXISTS users (
-        id BIGSERIAL PRIMARY KEY,
+        id VARCHAR(36) PRIMARY KEY,
         full_name VARCHAR(255) NOT NULL,
         username VARCHAR(191) UNIQUE NOT NULL,
         email VARCHAR(191) UNIQUE NOT NULL,
@@ -37,7 +37,7 @@ const tables = [
     name: 'chats',
     sql: `
       CREATE TABLE IF NOT EXISTS chats (
-        id BIGSERIAL PRIMARY KEY,
+        id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
         type VARCHAR(50) NOT NULL,
         title VARCHAR(255) NULL,
         group_image TEXT NULL,
@@ -49,9 +49,9 @@ const tables = [
     name: 'chat_participants',
     sql: `
       CREATE TABLE IF NOT EXISTS chat_participants (
-        id BIGSERIAL PRIMARY KEY,
-        chat_id BIGINT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
-        user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        chat_id VARCHAR(36) NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (chat_id, user_id)
       )
@@ -61,14 +61,14 @@ const tables = [
     name: 'messages',
     sql: `
       CREATE TABLE IF NOT EXISTS messages (
-        id BIGSERIAL PRIMARY KEY,
-        chat_id BIGINT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
-        sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        chat_id VARCHAR(36) NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+        sender_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         message TEXT,
         message_type VARCHAR(50) DEFAULT 'text',
         media_url TEXT,
         seen BOOLEAN DEFAULT false,
-        reply_to BIGINT NULL REFERENCES messages(id) ON DELETE SET NULL,
+        reply_to VARCHAR(36) NULL REFERENCES messages(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `

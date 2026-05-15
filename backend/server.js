@@ -1,5 +1,14 @@
 require('dotenv').config();
 
+// Global safety handlers to avoid the process exiting on unhandled errors.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Promise Rejection:', reason && reason.stack ? reason.stack : reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err && err.stack ? err.stack : err);
+});
+
 const path = require('path');
 const express = require('express');
 const http = require('http');

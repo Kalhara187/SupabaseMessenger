@@ -7,94 +7,204 @@ const {
   markChatSeenForUser,
 } = require('../models/messageModel');
 
+/**
+ * Validate that a value is a valid non-empty string ID
+ */
+const isValidId = (id) => {
+  if (!id) return false;
+  const trimmed = String(id).trim();
+  return trimmed.length > 0;
+};
+
+/**
+ * Get messages for a specific chat
+ * GET /api/messages/:chatId?limit=30&offset=0
+ */
 const getMessages = async (req, res, next) => {
   try {
-    const chatId = Number(req.params.chatId);
-    const limit = Number(req.query.limit || 30);
-    const offset = Number(req.query.offset || 0);
+    const chatId = req.params.chatId;
+    const limit = Math.min(Number(req.query.limit || 30), 100);
+    const offset = Math.max(Number(req.query.offset || 0), 0);
+
+    console.log('[MSG] Fetching messages:', { chatId, limit, offset });
+
+    if (!isValidId(chatId)) {
+      console.error('[MSG] Invalid chatId:', chatId);
+      return res.status(400).json({
+        message: 'Chat ID is required and must be a non-empty string',
+      });
+    }
+
+    if (!Number.isInteger(limit) || limit < 1) {
+      return res.status(400).json({ message: 'Limit must be a positive integer' });
+    }
+
+    if (!Number.isInteger(offset) || offset < 0) {
+      return res.status(400).json({ message: 'Offset must be a non-negative integer' });
+    }
 
     const allowed = await isUserInChat(chatId, req.user.id);
     if (!allowed) {
-      return res.status(403).json({ message: 'Forbidden' });
+      console.error('[MSG] User not authorized:', { userId: req.user.id, chatId });
+      return res.status(403).json({ message: 'You are not a member of this chat' });
     }
 
+    console.log('[MSG] Fetching from database:', { chatId, limit, offset });
     const messages = await getMessagesByChat(chatId, limit, offset);
-    return res.json(messages);
+
+    console.log('[MSG] Retrieved', messages.length, 'messages');
+    return res.json(messages || []);
   } catch (error) {
+    console.error('[MSG] getMessages error:', error.message);
+    console.error('[MSG] Stack:', error.stack);
     return next(error);
   }
 };
 
+/**
+ * Create a new message in a chat
+ * POST /api/messages
+ */
 const createNewMessage = async (req, res, next) => {
   try {
     const { chatId, message = '', messageType = 'text', replyTo = null } = req.body;
-    const numericChatId = Number(chatId);
+    const senderId = req.user.id;
+    const mediaUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
-    const allowed = await isUserInChat(numericChatId, req.user.id);
-    if (!allowed) {
-      return res.status(403).json({ message: 'Forbidden' });
+    console.log('[MSG] Creating message:', { chatId, messageType, hasMean: !!message, hasFile: !!req.file });
+
+    if (!isValidId(chatId)) {
+      console.error('[MSG] Invalid chatId:', chatId);
+      return res.status(400).json({ message: 'Chat ID is required and must be a non-empty string' });
     }
 
-    if (!message && !req.file) {
+    const trimmedMessage = String(message || '').trim();
+    if (!trimmedMessage && !mediaUrl) {
       return res.status(400).json({ message: 'Message content or media is required' });
     }
 
-    const mediaUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const validTypes = ['text', 'image', 'video', 'voice', 'file'];
+    if (!validTypes.includes(messageType)) {
+      return res.status(400).json({ message: `Message type must be one of: ${validTypes.join(', ')}` });
+    }
 
+    const allowed = await isUserInChat(chatId, senderId);
+    if (!allowed) {
+      console.error('[MSG] User not authorized:', { senderId, chatId });
+      return res.status(403).json({ message: 'You are not a member of this chat' });
+    }
+
+    console.log('[MSG] Inserting message:', { chatId, senderId, type: messageType });
     const messageId = await createMessage({
-      chatId: numericChatId,
-      senderId: req.user.id,
-      message,
+      chatId,
+      senderId,
+      message: trimmedMessage,
       messageType,
       mediaUrl,
       replyTo,
     });
 
-    const created = await findMessageById(messageId);
-    const participants = await getChatParticipants(numericChatId);
-
-    if (req.io) {
-      req.io.to(`chat:${numericChatId}`).emit('receive_message', created);
-      participants.forEach((participant) => {
-        req.io.to(`user:${participant.id}`).emit('receive_message', created);
-      });
+    if (!messageId) {
+      console.error('[MSG] Failed to create message');
+      return res.status(500).json({ message: 'Failed to create message' });
     }
 
+    const created = await findMessageById(messageId);
+    if (!created) {
+      console.error('[MSG] Could not retrieve created message:', messageId);
+      return res.status(500).json({ message: 'Message created but could not be retrieved' });
+    }
+
+    if (req.io) {
+      try {
+        const participants = await getChatParticipants(chatId);
+        console.log('[MSG] Emitting to', participants.length, 'participants');
+        participants.forEach((participant) => {
+          req.io.to(`user:${participant.id}`).emit('receive_message', created);
+        });
+      } catch (emitError) {
+        console.error('[MSG] Error emitting message:', emitError.message);
+      }
+    }
+
+    console.log('[MSG] Message created successfully:', messageId);
     return res.status(201).json(created);
   } catch (error) {
+    console.error('[MSG] createNewMessage error:', error.message);
+    console.error('[MSG] Stack:', error.stack);
     return next(error);
   }
 };
 
+/**
+ * Delete a message (only sender can delete)
+ * DELETE /api/messages/:id
+ */
 const deleteMessage = async (req, res, next) => {
   try {
-    const existing = await findMessageById(req.params.id);
-    if (!existing) {
+    const messageId = req.params.id;
+    const userId = req.user.id;
+
+    console.log('[MSG] Deleting message:', { messageId, userId });
+
+    if (!isValidId(messageId)) {
+      return res.status(400).json({ message: 'Message ID is required' });
+    }
+
+    const message = await findMessageById(messageId);
+    if (!message) {
       return res.status(404).json({ message: 'Message not found' });
     }
 
-    if (existing.sender_id !== req.user.id) {
-      return res.status(403).json({ message: 'Only sender can delete message' });
+    if (String(message.sender_id) !== String(userId)) {
+      console.error('[MSG] Unauthorized delete:', { messageId, userId, senderId: message.sender_id });
+      return res.status(403).json({ message: 'Only the message sender can delete this message' });
     }
 
-    await deleteMessageById(req.params.id);
-    return res.json({ message: 'Message deleted' });
+    await deleteMessageById(messageId);
+    console.log('[MSG] Message deleted successfully');
+    return res.json({ message: 'Message deleted successfully', id: messageId });
   } catch (error) {
+    console.error('[MSG] deleteMessage error:', error.message);
     return next(error);
   }
 };
 
+/**
+ * Mark all messages in a chat as seen by current user
+ * POST /api/messages/seen
+ */
 const seenMessage = async (req, res, next) => {
   try {
-    const chatId = Number(req.body.chatId);
-    await markChatSeenForUser(chatId, req.user.id);
+    const { chatId } = req.body;
+    const userId = req.user.id;
 
-    if (req.io) {
-      req.io.emit('message_seen', { chatId, userId: req.user.id });
+    console.log('[MSG] Marking as seen:', { chatId, userId });
+
+    if (!isValidId(chatId)) {
+      return res.status(400).json({ message: 'Chat ID is required and must be a non-empty string' });
     }
 
-    return res.json({ message: 'Messages marked as seen' });
+    const allowed = await isUserInChat(chatId, userId);
+    if (!allowed) {
+      console.error('[MSG] User not authorized:', { userId, chatId });
+      return res.status(403).json({ message: 'You are not a member of this chat' });
+    }
+
+    await markChatSeenForUser(chatId, userId);
+    console.log('[MSG] Messages marked as seen for chat:', chatId);
+
+    if (req.io) {
+      try {
+        req.io.to(`chat:${chatId}`).emit('message_seen', { chatId, userId });
+      } catch (emitError) {
+        console.error('[MSG] Error emitting seen event:', emitError.message);
+      }
+    }
+
+    return res.json({ message: 'Messages marked as seen', chatId });
   } catch (error) {
+    console.error('[MSG] seenMessage error:', error.message);
     return next(error);
   }
 };

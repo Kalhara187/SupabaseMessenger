@@ -44,16 +44,43 @@ const UsersScreen = ({ navigation }) => {
   const openChat = useCallback(
     async (selectedUser) => {
       try {
+        // Validation: ensure both IDs exist
+        if (!currentUser?.id) {
+          console.error('[USERS] currentUser.id missing:', currentUser);
+          Alert.alert('Error', 'Not authenticated. Please log in again.');
+          return;
+        }
+
+        if (!selectedUser?.id) {
+          console.error('[USERS] selectedUser.id missing:', selectedUser);
+          Alert.alert('Error', 'Invalid user selection.');
+          return;
+        }
+
+        const user1Id = String(currentUser.id);
+        const user2Id = String(selectedUser.id);
+
+        if (user1Id === user2Id) {
+          Alert.alert('Error', 'Cannot start a chat with yourself.');
+          return;
+        }
+
+        console.log('[USERS] Opening chat with validation passed:', { user1: user1Id, user2: user2Id });
+
         setOpeningChatId(selectedUser.id);
-        const chat = await findOrCreateChat({ user1: currentUser.id, user2: selectedUser.id });
+        const chat = await findOrCreateChat({ user1: user1Id, user2: user2Id });
+
+        console.log('[USERS] Chat created/found:', { chatId: chat.id, participants: chat.participants?.length });
+
         navigation.navigate('Chat', { chat, participant: selectedUser });
       } catch (error) {
-        Alert.alert('Could not open chat', error.response?.data?.message || 'Please try again.');
+        console.error('[USERS] Failed to open chat:', error);
+        Alert.alert('Could not open chat', error.response?.data?.message || error.message || 'Please try again.');
       } finally {
         setOpeningChatId(null);
       }
     },
-    [currentUser?.id, navigation]
+    [currentUser, navigation]
   );
 
   if (loading) {
