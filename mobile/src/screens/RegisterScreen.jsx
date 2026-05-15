@@ -29,17 +29,59 @@ const RegisterScreen = () => {
 
   const onSubmit = async () => {
     try {
+      console.log('[RegisterScreen] Submit clicked');
       setLoading(true);
       setErrorMessage('');
+
+      console.log('[RegisterScreen] Calling register with form data');
       await register(form);
+
+      console.log('[RegisterScreen] Registration succeeded!');
+      // Success will be handled by navigation context
     } catch (error) {
-      const validationMessages = error.response?.data?.errors?.map((item) => item.msg).filter(Boolean);
-      const message =
-        error.response?.data?.message ||
-        validationMessages?.join('\n') ||
-        'Please try again.';
-      setErrorMessage(message);
+      console.error('[RegisterScreen] Registration error caught!');
+      console.error('[RegisterScreen] Error type:', error.constructor.name);
+      console.error('[RegisterScreen] Error message:', error.message);
+      console.error('[RegisterScreen] Error code:', error.code);
+      console.error('[RegisterScreen] Full error:', JSON.stringify(error, null, 2));
+
+      if (error.response) {
+        console.error('[RegisterScreen] HTTP Error Response:');
+        console.error('  Status:', error.response.status);
+        console.error('  Status Text:', error.response.statusText);
+        console.error('  Data:', error.response.data);
+      }
+
+      if (error.request && !error.response) {
+        console.error('[RegisterScreen] Network request failed (no response)');
+        console.error('  Request:', error.request);
+      }
+
+      if (!error.request && !error.response) {
+        console.error('[RegisterScreen] Error occurred before request could be sent');
+      }
+
+      // Extract and display error message
+      let displayMessage = 'Please try again.';
+
+      if (error.response?.data?.message) {
+        displayMessage = error.response.data.message;
+      } else if (error.response?.data?.errors) {
+        const validationMessages = error.response.data.errors
+          .map((item) => item.msg)
+          .filter(Boolean);
+        displayMessage = validationMessages.join('\n') || displayMessage;
+      } else if (error.message) {
+        displayMessage = error.message;
+      }
+
+      console.log('[RegisterScreen] Displaying error message:', displayMessage);
+      setErrorMessage(displayMessage);
+
+      // Also show an alert for visibility
+      alert(`Registration failed:\n\n${displayMessage}`);
     } finally {
+      console.log('[RegisterScreen] Cleanup: resetting loading state');
       setLoading(false);
     }
   };

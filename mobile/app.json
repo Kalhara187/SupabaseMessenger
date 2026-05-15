@@ -19,14 +19,15 @@
       "supportsTablet": false
     },
     "android": {
-      "package": "com.sqlrealtime.messenger"
+      "package": "com.sqlrealtime.messenger",
+      "usesCleartextTraffic": true
     },
     "plugins": [
       "expo-notifications",
       "expo-image-picker"
     ],
     "extra": {
-      "apiUrl": "http://10.83.57.105:5000"
+      "apiUrl": "http://10.35.56.160:5000"
     }
   }
 }

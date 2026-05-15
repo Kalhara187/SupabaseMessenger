@@ -13,15 +13,30 @@ const signToken = (user) => jwt.sign({ id: user.id, email: user.email }, process
 
 const register = async (req, res, next) => {
   try {
+    console.log('[AUTH] Register request received');
+    console.log('[AUTH] Body:', { fullName: req.body.fullName, username: req.body.username, email: req.body.email });
+    console.log('[AUTH] File:', req.file ? { filename: req.file.filename, size: req.file.size } : null);
+
     const { fullName, username, email, password } = req.body;
+
+    console.log('[AUTH] Checking if email already exists:', email);
     const existing = await findUserByEmail(email);
 
     if (existing) {
+      console.log('[AUTH] Email already in use:', email);
       return res.status(409).json({ message: 'Email is already in use' });
     }
 
+    console.log('[AUTH] Hashing password');
     const hashedPassword = await bcrypt.hash(password, 10);
     const profileImage = req.file ? `/uploads/${req.file.filename}` : null;
+
+    console.log('[AUTH] Creating user with:', {
+      fullName,
+      username,
+      email,
+      hasProfileImage: !!profileImage,
+    });
 
     const userId = await createUser({
       fullName,
@@ -31,11 +46,23 @@ const register = async (req, res, next) => {
       profileImage,
     });
 
+    if (!userId) {
+      console.error('[AUTH] createUser returned no userId for email:', email);
+      return res.status(500).json({ message: 'Failed to create user account' });
+    }
+
+    console.log('[AUTH] User created with ID:', userId);
+    console.log('[AUTH] Fetching user profile');
+
     const user = await findUserById(userId);
     const token = signToken({ id: userId, email });
 
+    console.log('[AUTH] Registration successful. Returning token and user');
     return res.status(201).json({ token, user });
   } catch (error) {
+    console.error('[AUTH] Registration error:', error.message);
+    console.error('[AUTH] Error stack:', error.stack);
+    console.error('[AUTH] Full error:', error);
     return next(error);
   }
 };

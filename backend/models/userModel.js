@@ -14,27 +14,43 @@ const getSupabaseHeaders = () => {
 };
 
 const supabaseRequest = async (path, options = {}) => {
-  const response = await fetch(`${supabaseUrl}${path}`, {
-    method: options.method || 'GET',
-    headers: {
-      ...getSupabaseHeaders(),
-      ...(options.headers || {}),
-      ...(options.returnRepresentation ? { Prefer: 'return=representation' } : {}),
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const fullUrl = `${supabaseUrl}${path}`;
+  const method = options.method || 'GET';
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || `Supabase request failed with status ${response.status}`);
+  console.log(`[SUPABASE] ${method} ${path}`);
+
+  try {
+    const response = await fetch(fullUrl, {
+      method,
+      headers: {
+        ...getSupabaseHeaders(),
+        ...(options.headers || {}),
+        ...(options.returnRepresentation ? { Prefer: 'return=representation' } : {}),
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+
+    console.log(`[SUPABASE] Response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[SUPABASE] ${method} ${path} failed with status ${response.status}`);
+      console.error(`[SUPABASE] Error response:`, errorText);
+      throw new Error(`Supabase request failed: ${response.status} - ${errorText || 'Unknown error'}`);
+    }
+
+    const text = await response.text();
+    const result = text ? JSON.parse(text) : null;
+    console.log(`[SUPABASE] Response data:`, result);
+    return result;
+  } catch (error) {
+    console.error('[SUPABASE] Request error:', error.message || error);
+    throw error;
   }
-
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
 };
 
 const createUser = async ({ fullName, username, email, password, profileImage = null }) => {
-  const rows = await supabaseRequest('users', {
+  const response = await supabaseRequest('users', {
     method: 'POST',
     returnRepresentation: true,
     body: {
@@ -46,7 +62,15 @@ const createUser = async ({ fullName, username, email, password, profileImage = 
     },
   });
 
-  return rows?.[0]?.id || null;
+  // Handle both array and object responses from Supabase
+  if (Array.isArray(response) && response.length > 0) {
+    return response[0].id;
+  } else if (response && typeof response === 'object' && response.id) {
+    return response.id;
+  }
+
+  console.warn('Unexpected response format from Supabase createUser:', response);
+  return null;
 };
 
 const findUserByEmail = async (email) => {

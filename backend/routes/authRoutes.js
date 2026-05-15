@@ -13,9 +13,17 @@ const upload = require('../middleware/uploadMiddleware');
 
 const router = express.Router();
 
+const maybeUploadProfileImage = (req, res, next) => {
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    return upload.single('profileImage')(req, res, next);
+  }
+  return next();
+};
+
 router.post(
   '/register',
-  upload.single('profileImage'),
+  maybeUploadProfileImage,
   [
     body('fullName').trim().isLength({ min: 2 }),
     body('username').trim().isLength({ min: 3 }),

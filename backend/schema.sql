@@ -1,51 +1,50 @@
-CREATE DATABASE IF NOT EXISTS sql_realtime_messenger CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
-USE sql_realtime_messenger;
+-- Supabase / PostgreSQL schema for SupabaseMessenger
+-- Run this in Supabase SQL Editor.
 
-CREATE TABLE IF NOT EXISTS users (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  full_name VARCHAR(255) NOT NULL,
-  username VARCHAR(191) UNIQUE NOT NULL,
-  email VARCHAR(191) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  profile_image TEXT,
-  bio TEXT,
-  is_online BOOLEAN DEFAULT false,
-  last_seen TIMESTAMP NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+create extension if not exists pgcrypto;
+
+create table if not exists public.users (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null,
+  username text not null unique,
+  email text not null unique,
+  password text not null,
+  profile_image text,
+  bio text,
+  is_online boolean not null default false,
+  last_seen timestamptz,
+  created_at timestamptz not null default now()
 );
 
-CREATE TABLE IF NOT EXISTS chats (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  type VARCHAR(50) NOT NULL,
-  title VARCHAR(255) NULL,
-  group_image TEXT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+create table if not exists public.chats (
+  id uuid primary key default gen_random_uuid(),
+  type text not null,
+  title text,
+  group_image text,
+  created_at timestamptz not null default now()
 );
 
-CREATE TABLE IF NOT EXISTS chat_participants (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  chat_id INT NOT NULL,
-  user_id INT NOT NULL,
-  joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  UNIQUE KEY uniq_chat_user (chat_id, user_id)
+create table if not exists public.chat_participants (
+  id uuid primary key default gen_random_uuid(),
+  chat_id uuid not null references public.chats(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  joined_at timestamptz not null default now(),
+  unique (chat_id, user_id)
 );
 
-CREATE TABLE IF NOT EXISTS messages (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  chat_id INT NOT NULL,
-  sender_id INT NOT NULL,
-  message TEXT,
-  message_type VARCHAR(50) DEFAULT 'text',
-  media_url TEXT,
-  seen BOOLEAN DEFAULT false,
-  reply_to INT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
-  FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (reply_to) REFERENCES messages(id) ON DELETE SET NULL
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  chat_id uuid not null references public.chats(id) on delete cascade,
+  sender_id uuid not null references public.users(id) on delete cascade,
+  message text,
+  message_type text not null default 'text',
+  media_url text,
+  seen boolean not null default false,
+  reply_to uuid references public.messages(id) on delete set null,
+  created_at timestamptz not null default now()
 );
 
-CREATE INDEX idx_messages_chat_created ON messages(chat_id, created_at);
-CREATE INDEX idx_users_username ON users(username);
+create index if not exists idx_messages_chat_created on public.messages(chat_id, created_at);
+create index if not exists idx_users_username on public.users(username);
+create index if not exists idx_chat_participants_chat_id on public.chat_participants(chat_id);
+create index if not exists idx_chat_participants_user_id on public.chat_participants(user_id);

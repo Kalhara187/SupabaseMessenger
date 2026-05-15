@@ -52,6 +52,10 @@ const start = async () => {
     res.json({ status: 'ok', service: 'SQLRealtimeMessenger Backend' });
   });
 
+  app.get('/', (req, res) => {
+    res.send('Backend server working');
+  });
+
   app.get('/health/supabase', async (req, res) => {
     if (!checkSupabaseConnection) {
       return res.status(503).json({
@@ -89,10 +93,11 @@ const start = async () => {
 
   app.use(errorHandler);
 
+  const HOST = process.env.HOST || '0.0.0.0';
   const PORT = Number(process.env.PORT || 5000);
 
-  server.listen(PORT, () => {
-    console.log(`Backend listening on port ${PORT}`);
+  server.listen(PORT, HOST, () => {
+    console.log(`Backend listening on http://${HOST}:${PORT}`);
   });
 };
 
