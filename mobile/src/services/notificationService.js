@@ -1,19 +1,27 @@
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+const configureNotificationHandler = (Notifications) => {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+};
 
 export const registerForPushNotifications = async () => {
-  if (!Device.isDevice) {
+  const isExpoGo =
+    Constants.appOwnership === 'expo' || Constants.executionEnvironment === 'storeClient';
+
+  if (!Device.isDevice || isExpoGo) {
     return null;
   }
+
+  const Notifications = await import('expo-notifications');
+  configureNotificationHandler(Notifications);
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -37,6 +45,11 @@ export const registerForPushNotifications = async () => {
     });
   }
 
-  const token = await Notifications.getExpoPushTokenAsync();
-  return token.data;
+  try {
+    const token = await Notifications.getExpoPushTokenAsync();
+    return token.data;
+  } catch (error) {
+    console.warn('Push token registration skipped:', error?.message || error);
+    return null;
+  }
 };

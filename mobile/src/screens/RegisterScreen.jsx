@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import AuthInput from '../components/AuthInput';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ const RegisterScreen = () => {
     profileImage: null,
   });
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -29,9 +30,15 @@ const RegisterScreen = () => {
   const onSubmit = async () => {
     try {
       setLoading(true);
+      setErrorMessage('');
       await register(form);
     } catch (error) {
-      Alert.alert('Registration failed', error.response?.data?.message || 'Please try again.');
+      const validationMessages = error.response?.data?.errors?.map((item) => item.msg).filter(Boolean);
+      const message =
+        error.response?.data?.message ||
+        validationMessages?.join('\n') ||
+        'Please try again.';
+      setErrorMessage(message);
     } finally {
       setLoading(false);
     }
@@ -53,6 +60,8 @@ const RegisterScreen = () => {
       <Pressable onPress={onSubmit} disabled={loading} className="bg-brand-500 py-4 rounded-2xl mt-5">
         <Text className="text-white font-semibold text-center">{loading ? 'Creating account...' : 'Create account'}</Text>
       </Pressable>
+
+      {!!errorMessage && <Text className="text-red-400 text-sm mt-3 text-center">{errorMessage}</Text>}
     </View>
   );
 };

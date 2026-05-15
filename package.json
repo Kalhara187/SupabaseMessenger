@@ -1,0 +1,9 @@
+{
+  "name": "SupabaseMessenger",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start:mobile": "cd mobile && npx expo start",
+    "start": "npm run start:mobile"
+  }
+}

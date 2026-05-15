@@ -26,7 +26,29 @@ const initDb = async (opts = {}) => {
   });
 
   try {
-    await connection.query(schema);
+    // Split schema into tables and indexes
+    const indexStatements = schema.match(/CREATE INDEX .+;/g) || [];
+    const tableStatements = schema.replace(/CREATE INDEX .+;/g, '').trim();
+
+    // Create tables first
+    if (tableStatements) {
+      await connection.query(tableStatements);
+      console.log('Database tables ensured');
+    }
+
+    // Create indexes (ignore errors if they already exist)
+    for (const indexStatement of indexStatements) {
+      try {
+        await connection.query(indexStatement);
+      } catch (indexErr) {
+        // Silently ignore duplicate index errors
+        if (indexErr.code !== 'ER_DUP_KEYNAME') {
+          throw indexErr;
+        }
+        console.warn('Index already exists, skipping:', indexStatement.substring(0, 50) + '...');
+      }
+    }
+
     console.log('Database schema ensured');
   } catch (err) {
     console.error('Failed to initialize database schema', err.message || err);

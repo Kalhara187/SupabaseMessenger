@@ -8,6 +8,14 @@ const { Server } = require('socket.io');
 
 const initDb = require('./initDb');
 
+let checkSupabaseConnection = null;
+try {
+  const supabaseDb = require('./config/supabaseDb');
+  checkSupabaseConnection = supabaseDb.checkSupabaseConnection;
+} catch (err) {
+  console.warn('Supabase pg module not yet installed. Run: npm install');
+}
+
 const start = async () => {
   await initDb();
 
@@ -42,6 +50,36 @@ const start = async () => {
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'SQLRealtimeMessenger Backend' });
+  });
+
+  app.get('/health/supabase', async (req, res) => {
+    if (!checkSupabaseConnection) {
+      return res.status(503).json({
+        service: 'Supabase database',
+        connected: false,
+        message: 'pg module not installed. Run: npm install',
+      });
+    }
+
+    const result = await checkSupabaseConnection();
+    const statusCode = result.connected ? 200 : 503;
+
+    if (result.connected) {
+      console.log('Supabase database connected', {
+        latencyMs: result.latencyMs,
+        serverTime: result.serverTime,
+      });
+    } else {
+      console.warn('Supabase database connection failed', {
+        latencyMs: result.latencyMs,
+        message: result.message,
+      });
+    }
+
+    res.status(statusCode).json({
+      service: 'Supabase database',
+      ...result,
+    });
   });
 
   app.use('/api/auth', authRoutes);

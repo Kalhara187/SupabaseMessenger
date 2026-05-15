@@ -59,7 +59,7 @@ const AppNavigator = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      registerForPushNotifications();
+      registerForPushNotifications().catch(() => {});
     }
   }, [isAuthenticated]);
 
