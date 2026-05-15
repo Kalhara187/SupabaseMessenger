@@ -110,7 +110,7 @@ const updateProfile = async (id, payload) => {
 };
 
 const listUsers = async (query) => {
-  const rows = await supabaseRequest('users?select=id,full_name,username,profile_image,bio,is_online,last_seen,created_at&order=full_name.asc&limit=100');
+  const rows = await supabaseRequest('users?select=id,full_name,username,email,profile_image,bio,is_online,last_seen,created_at&order=full_name.asc&limit=100');
 
   if (!query) {
     return rows || [];
@@ -120,7 +120,8 @@ const listUsers = async (query) => {
   return (rows || []).filter((item) => {
     const fullName = String(item.full_name || '').toLowerCase();
     const username = String(item.username || '').toLowerCase();
-    return fullName.includes(search) || username.includes(search);
+    const email = String(item.email || '').toLowerCase();
+    return fullName.includes(search) || username.includes(search) || email.includes(search);
   }).slice(0, 50);
 };
 

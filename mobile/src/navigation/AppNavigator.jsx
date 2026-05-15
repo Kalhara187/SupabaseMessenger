@@ -13,7 +13,7 @@ import HomeScreen from '../screens/HomeScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import SearchScreen from '../screens/SearchScreen';
+import UsersScreen from '../screens/UsersScreen';
 import GroupManagementScreen from '../screens/GroupManagementScreen';
 
 const Stack = createNativeStackNavigator();
@@ -30,7 +30,7 @@ const tabsOptions = {
 const MainTabs = () => (
   <Tab.Navigator screenOptions={tabsOptions}>
     <Tab.Screen name="Chats" component={HomeScreen} />
-    <Tab.Screen name="Search" component={SearchScreen} />
+    <Tab.Screen name="Users" component={UsersScreen} />
     <Tab.Screen name="Profile" component={ProfileScreen} />
     <Tab.Screen name="Settings" component={SettingsScreen} />
   </Tab.Navigator>

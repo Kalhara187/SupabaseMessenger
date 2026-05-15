@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { GiftedChat, Bubble } from 'react-native-gifted-chat';
 import { useAuth } from '../context/AuthContext';
@@ -17,31 +17,37 @@ const mapToGiftedMessage = (item) => ({
   },
 });
 
-const ChatScreen = ({ route }) => {
-  const { chat } = route.params;
+const ChatScreen = ({ route, navigation }) => {
+  const { chat, participant } = route.params;
   const { user } = useAuth();
   const { messagesByChat, setMessages } = useChatStore();
   const [loading, setLoading] = useState(false);
+  const chatId = chat?.id || chat?.chatId;
+
+  useLayoutEffect(() => {
+    const title = chat?.title || participant?.full_name || participant?.username || 'Conversation';
+    navigation.setOptions({ title });
+  }, [chat?.title, navigation, participant?.full_name, participant?.username]);
 
   const messages = useMemo(
-    () => (messagesByChat[chat.id] || []).map(mapToGiftedMessage).reverse(),
-    [messagesByChat, chat.id]
+    () => (messagesByChat[chatId] || []).map(mapToGiftedMessage).reverse(),
+    [messagesByChat, chatId]
   );
 
   const loadMessages = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await fetchMessages(chat.id);
-      setMessages(chat.id, data);
+      const data = await fetchMessages(chatId);
+      setMessages(chatId, data);
 
       const socket = getSocket();
-      socket?.emit('join_chat', chat.id);
+      socket?.emit('join_chat', chatId);
     } catch (error) {
       Alert.alert('Could not load messages', 'Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [chat.id, setMessages]);
+  }, [chatId, setMessages]);
 
   useEffect(() => {
     loadMessages();
@@ -52,7 +58,7 @@ const ChatScreen = ({ route }) => {
       const [first] = newMessages;
       try {
         await sendMessage({
-          chatId: chat.id,
+          chatId,
           text: first.text,
           messageType: 'text',
         });
@@ -60,7 +66,7 @@ const ChatScreen = ({ route }) => {
         Alert.alert('Send failed', 'Message could not be sent.');
       }
     },
-    [chat.id]
+    [chatId]
   );
 
   return (

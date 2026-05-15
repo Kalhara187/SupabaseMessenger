@@ -25,9 +25,6 @@
     "plugins": [
       "expo-notifications",
       "expo-image-picker"
-    ],
-    "extra": {
-      "apiUrl": "http://10.35.56.160:5000"
-    }
+    ]
   }
 }

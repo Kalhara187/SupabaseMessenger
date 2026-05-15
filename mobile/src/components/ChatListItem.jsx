@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, View, Text } from 'react-native';
 
 const ChatListItem = ({ chat, onPress }) => {
-  const title = chat.title || (chat.type === 'group' ? 'Group Chat' : `Chat #${chat.id}`);
+  const title = chat.display_name || chat.title || (chat.type === 'group' ? 'Group Chat' : `Chat #${chat.id}`);
 
   return (
     <Pressable

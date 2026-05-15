@@ -1,7 +1,6 @@
 import axios from 'axios';
 import * as Network from 'expo-network';
 import { NativeModules, Platform } from 'react-native';
-import appConfig from '../../app.json';
 
 const normalizeHost = (rawHost) => {
   if (!rawHost || typeof rawHost !== 'string') {
@@ -18,22 +17,6 @@ const normalizeHost = (rawHost) => {
   }
 
   return `http://${trimmed}`;
-};
-
-const getHostFromExpoConfig = () => {
-  // Prefer static app.json extra.apiUrl because it works consistently in Expo runtime.
-  const appJsonHost = appConfig?.expo?.extra?.apiUrl;
-  if (appJsonHost) {
-    return appJsonHost;
-  }
-
-  // Fallback: Expo may also expose config under process env in some runtimes.
-  try {
-    const parsedConfig = process.env.EXPO_CONFIG ? JSON.parse(process.env.EXPO_CONFIG) : null;
-    return parsedConfig?.extra?.apiUrl || null;
-  } catch {
-    return null;
-  }
 };
 
 const getHostFromMetroScriptUrl = () => {
@@ -58,9 +41,9 @@ const getHostFromMetroScriptUrl = () => {
 };
 
 const resolveApiHost = () => {
-  const appConfigHost = normalizeHost(getHostFromExpoConfig());
-  if (appConfigHost) {
-    return appConfigHost;
+  const metroHost = normalizeHost(getHostFromMetroScriptUrl());
+  if (metroHost) {
+    return metroHost;
   }
 
   const envHost = normalizeHost(process.env.EXPO_PUBLIC_API_URL);
@@ -68,12 +51,7 @@ const resolveApiHost = () => {
     return envHost;
   }
 
-  const metroHost = normalizeHost(getHostFromMetroScriptUrl());
-  if (metroHost) {
-    return metroHost;
-  }
-
-  return Platform.OS === 'android' ? 'http://10.35.56.160:5000' : 'http://localhost:5000';
+  return Platform.OS === 'android' ? 'http://10.0.2.2:5000' : 'http://localhost:5000';
 };
 
 let API_HOST = resolveApiHost();

@@ -54,6 +54,7 @@ const createNewMessage = async (req, res, next) => {
     const participants = await getChatParticipants(numericChatId);
 
     if (req.io) {
+      req.io.to(`chat:${numericChatId}`).emit('receive_message', created);
       participants.forEach((participant) => {
         req.io.to(`user:${participant.id}`).emit('receive_message', created);
       });

@@ -5,6 +5,14 @@ export const fetchChats = async () => {
   return data;
 };
 
+export const findOrCreateChat = async ({ user1, user2 }) => {
+  const { data } = await api.get('/chats/find-or-create', {
+    params: { user1, user2 },
+  });
+
+  return data;
+};
+
 export const createChat = async ({ type, participantIds, title, groupImage }) => {
   const formData = new FormData();
   formData.append('type', type);
