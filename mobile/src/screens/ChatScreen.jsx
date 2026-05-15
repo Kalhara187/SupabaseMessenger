@@ -9,7 +9,7 @@ import { getSocket } from '../services/socketService';
 const mapToGiftedMessage = (item) => ({
   _id: item.id,
   text: item.message || '',
-  createdAt: item.created_at,
+  createdAt: item.created_at ? new Date(item.created_at) : new Date(),
   user: {
     _id: item.sender_id,
     name: item.sender_name || item.sender_username || 'User',
@@ -20,9 +20,9 @@ const mapToGiftedMessage = (item) => ({
 const ChatScreen = ({ route, navigation }) => {
   const { chat, participant } = route.params;
   const { user } = useAuth();
-  const { messagesByChat, setMessages } = useChatStore();
+  const { messagesByChat, setMessages, addMessage, upsertChatPreview } = useChatStore();
   const [loading, setLoading] = useState(false);
-  const chatId = chat?.id || chat?.chatId;
+  const chatId = String(chat?.id || chat?.chatId || '');
 
   useLayoutEffect(() => {
     const title = chat?.title || participant?.full_name || participant?.username || 'Conversation';
@@ -30,15 +30,38 @@ const ChatScreen = ({ route, navigation }) => {
   }, [chat?.title, navigation, participant?.full_name, participant?.username]);
 
   const messages = useMemo(
-    () => (messagesByChat[chatId] || []).map(mapToGiftedMessage).reverse(),
+    () => {
+      const source = Array.isArray(messagesByChat[chatId]) ? messagesByChat[chatId] : [];
+      const mapped = source.map(mapToGiftedMessage).reverse();
+
+      return mapped;
+    },
     [messagesByChat, chatId]
   );
+
+  useEffect(() => {
+    console.log('[CHAT-SCREEN] messages state updated:', {
+      chatId,
+      storeCount: Array.isArray(messagesByChat[chatId]) ? messagesByChat[chatId].length : 0,
+      giftedCount: messages.length,
+      firstId: messages[0]?._id,
+    });
+  }, [chatId, messages, messagesByChat]);
 
   const loadMessages = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await fetchMessages(chatId);
-      setMessages(chatId, data);
+      if (!chatId) {
+        return;
+      }
+
+      const fetchedMessages = await fetchMessages(chatId);
+      console.log('[CHAT-SCREEN] fetched messages:', {
+        chatId,
+        count: fetchedMessages.length,
+        sampleId: fetchedMessages[0]?.id,
+      });
+      setMessages(chatId, fetchedMessages);
 
       const socket = getSocket();
       socket?.emit('join_chat', chatId);
@@ -56,15 +79,55 @@ const ChatScreen = ({ route, navigation }) => {
   const onSend = useCallback(
     async (newMessages = []) => {
       const [first] = newMessages;
+      if (!first?.text?.trim()) {
+        return;
+      }
+
       try {
-        await sendMessage({
+        const created = await sendMessage({
           chatId,
           text: first.text,
           messageType: 'text',
         });
+
+        if (created?.id || created?._id) {
+          addMessage(chatId, created);
+          upsertChatPreview(chatId, created);
+          console.log('[CHAT-SCREEN] appended created message:', {
+            chatId,
+            id: created.id ?? created._id,
+          });
+        }
       } catch (error) {
         Alert.alert('Send failed', 'Message could not be sent.');
       }
+    },
+    [addMessage, chatId, upsertChatPreview]
+  );
+
+  const renderBubble = useCallback(
+    (props) => {
+      if (props?.currentMessage?._id) {
+        console.log('[CHAT-SCREEN] renderItem message:', {
+          id: props.currentMessage._id,
+          chatId,
+          text: props.currentMessage.text,
+        });
+      }
+
+      return (
+        <Bubble
+          {...props}
+          wrapperStyle={{
+            right: { backgroundColor: '#1DAA61' },
+            left: { backgroundColor: '#334155' },
+          }}
+          textStyle={{
+            right: { color: '#FFFFFF' },
+            left: { color: '#F8FAFC' },
+          }}
+        />
+      );
     },
     [chatId]
   );
@@ -74,21 +137,10 @@ const ChatScreen = ({ route, navigation }) => {
       <GiftedChat
         messages={messages}
         onSend={(newMessages) => onSend(newMessages)}
-        user={{ _id: user.id }}
+        user={{ _id: String(user.id) }}
         isLoadingEarlier={loading}
-        renderBubble={(props) => (
-          <Bubble
-            {...props}
-            wrapperStyle={{
-              right: { backgroundColor: '#1DAA61' },
-              left: { backgroundColor: '#334155' },
-            }}
-            textStyle={{
-              right: { color: '#FFFFFF' },
-              left: { color: '#F8FAFC' },
-            }}
-          />
-        )}
+        renderBubble={renderBubble}
+        keyExtractor={(item) => String(item._id)}
         placeholder="Write a message"
       />
     </View>

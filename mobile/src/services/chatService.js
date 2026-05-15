@@ -1,5 +1,21 @@
 import api from './api';
 
+const extractMessagesArray = (payload) => {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload?.messages)) {
+    return payload.messages;
+  }
+
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+
+  return [];
+};
+
 export const fetchChats = async () => {
   const { data } = await api.get('/chats');
   return data;
@@ -37,7 +53,17 @@ export const createChat = async ({ type, participantIds, title, groupImage }) =>
 
 export const fetchMessages = async (chatId, page = 0, pageSize = 30) => {
   const { data } = await api.get(`/messages/${chatId}?limit=${pageSize}&offset=${page * pageSize}`);
-  return data;
+  const messages = extractMessagesArray(data);
+
+  console.log('[CHAT-SERVICE] fetchMessages response shape:', {
+    isArray: Array.isArray(data),
+    hasMessages: Array.isArray(data?.messages),
+    hasData: Array.isArray(data?.data),
+    count: messages.length,
+    chatId: String(chatId),
+  });
+
+  return messages;
 };
 
 export const sendMessage = async ({ chatId, text, messageType = 'text', media }) => {
@@ -56,6 +82,13 @@ export const sendMessage = async ({ chatId, text, messageType = 'text', media })
 
   const { data } = await api.post('/messages', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+  console.log('[CHAT-SERVICE] sendMessage response:', {
+    chatId: String(chatId),
+    id: data?.id ?? data?._id,
+    senderId: data?.sender_id,
+    hasText: Boolean(data?.message),
   });
 
   return data;
