@@ -43,7 +43,7 @@ const getUserChats = async (userId) => {
       (
         SELECT COUNT(*)
         FROM messages um
-        WHERE um.chat_id = c.id AND um.seen = 0 AND um.sender_id <> ?
+        WHERE um.chat_id = c.id AND um.seen = false AND um.sender_id <> ?
       ) AS unread_count
     FROM chats c
     INNER JOIN chat_participants cp ON cp.chat_id = c.id

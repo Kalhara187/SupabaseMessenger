@@ -33,12 +33,9 @@ export const initApi = async () => {
     // If user provided EXPO_PUBLIC_API_URL, prefer it
     if (process.env.EXPO_PUBLIC_API_URL && process.env.EXPO_PUBLIC_API_URL !== '') {
       API_HOST = process.env.EXPO_PUBLIC_API_URL;
-    } else {
-      const info = await Network.getIpAddressAsync();
-      if (info) {
-        API_HOST = `http://${info}:5000`;
-      }
     }
+    // For Android emulator or when env not set, use default
+    // API_HOST remains as http://10.0.2.2:5000 (Android emulator default)
   } catch (err) {
     // fallback remains
   }

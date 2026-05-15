@@ -35,7 +35,7 @@ const deleteMessageById = async (messageId) => {
 
 const markChatSeenForUser = async (chatId, userId) => {
   await pool.execute(
-    'UPDATE messages SET seen = 1 WHERE chat_id = ? AND sender_id <> ?',
+    'UPDATE messages SET seen = true WHERE chat_id = ? AND sender_id <> ?',
     [chatId, userId]
   );
 };

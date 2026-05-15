@@ -3,6 +3,11 @@ const path = require('path');
 const mysql = require('mysql2/promise');
 
 const initDb = async (opts = {}) => {
+  if (process.env.DATABASE_URL) {
+    console.log('Supabase/Postgres detected; skipping local MySQL schema init');
+    return;
+  }
+
   const host = process.env.DB_HOST || opts.host || 'localhost';
   const port = Number(process.env.DB_PORT || opts.port || 3306);
   const user = process.env.DB_USER || opts.user || 'root';
