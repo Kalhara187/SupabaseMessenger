@@ -23,8 +23,11 @@ npm install
 npm run dev
 ```
 
+The server binds to `0.0.0.0` and logs the detected LAN IPs plus the health check URL on startup.
+
 ## API Endpoints
 
+- GET `/api/health`
 - POST `/api/auth/register`
 - POST `/api/auth/login`
 - POST `/api/auth/logout`
@@ -51,3 +54,10 @@ npm run dev
 - `message_seen`
 - `user_online`
 - `user_offline`
+
+## Mobile Networking
+
+- Use `localhost` or `127.0.0.1` only when the client and server are on the same machine.
+- Use `10.0.2.2` from the Android emulator to reach the host machine.
+- Use a LAN IP such as `192.168.x.x` from a physical Android device.
+- If Wi-Fi changes and the computer gets a new IP, update `mobile/.env` and restart the Expo client.

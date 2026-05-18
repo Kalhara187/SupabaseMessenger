@@ -42,7 +42,9 @@ export const AuthProvider = ({ children }) => {
 // initialize API host on mount
 export const AuthProviderWrapper = ({ children }) => {
   useEffect(() => {
-    initApi().then((host) => console.log('API host set to', host)).catch(() => {});
+    initApi()
+      .then((host) => console.log('[API] Host set to', host))
+      .catch((error) => console.warn('[API] Initialization warning:', error?.message));
   }, []);
 
   return <AuthProvider>{children}</AuthProvider>;

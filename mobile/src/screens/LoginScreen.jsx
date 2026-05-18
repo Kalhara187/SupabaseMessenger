@@ -14,7 +14,7 @@ const LoginScreen = ({ navigation }) => {
       setLoading(true);
       await login({ email, password });
     } catch (error) {
-      Alert.alert('Login failed', error.response?.data?.message || 'Please check your credentials.');
+      Alert.alert('Login failed', error.userMessage || error.response?.data?.message || error.message || 'Please check your credentials and network connection.');
     } finally {
       setLoading(false);
     }

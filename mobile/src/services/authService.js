@@ -1,4 +1,4 @@
-import api, { getApiHost } from './api';
+import { getApiHost, isServerReachable, requestWithRetries } from './api';
 
 export const registerUser = async (payload) => {
   console.log('[REGISTER] Service version: v2-json-or-fetch');
@@ -20,16 +20,20 @@ export const registerUser = async (payload) => {
   });
 
   try {
+    await isServerReachable();
     console.log('[REGISTER] Sending POST request to /auth/register');
     let data;
 
     if (!normalizedPayload.profileImage) {
-      // Use JSON when there is no file to avoid multipart edge cases on Android.
-      const response = await api.post('/auth/register', {
-        fullName: normalizedPayload.fullName,
-        username: normalizedPayload.username,
-        email: normalizedPayload.email,
-        password: normalizedPayload.password,
+      const response = await requestWithRetries({
+        method: 'post',
+        url: '/auth/register',
+        data: {
+          fullName: normalizedPayload.fullName,
+          username: normalizedPayload.username,
+          email: normalizedPayload.email,
+          password: normalizedPayload.password,
+        },
       });
       data = response.data;
     } else {
@@ -80,21 +84,36 @@ export const registerUser = async (payload) => {
 };
 
 export const loginUser = async ({ email, password }) => {
-  const { data } = await api.post('/auth/login', { email, password });
+  await isServerReachable();
+  const { data } = await requestWithRetries({
+    method: 'post',
+    url: '/auth/login',
+    data: { email, password },
+  });
   return data;
 };
 
 export const loadProfile = async () => {
-  const { data } = await api.get('/auth/profile');
+  const { data } = await requestWithRetries({
+    method: 'get',
+    url: '/auth/profile',
+  });
   return data;
 };
 
 export const forgotPasswordRequest = async (email) => {
-  const { data } = await api.post('/auth/forgot-password', { email });
+  const { data } = await requestWithRetries({
+    method: 'post',
+    url: '/auth/forgot-password',
+    data: { email },
+  });
   return data;
 };
 
 export const logoutUser = async () => {
-  const { data } = await api.post('/auth/logout');
+  const { data } = await requestWithRetries({
+    method: 'post',
+    url: '/auth/logout',
+  });
   return data;
 };

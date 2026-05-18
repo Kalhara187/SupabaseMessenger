@@ -20,8 +20,13 @@
     },
     "android": {
       "package": "com.sqlrealtime.messenger",
-      "usesCleartextTraffic": true
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
+    "extra": {},
     "plugins": [
       "expo-notifications",
       "expo-image-picker"
