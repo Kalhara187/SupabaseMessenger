@@ -4,16 +4,29 @@ const createMessage = async ({ chatId, senderId, message, messageType, mediaUrl 
   console.log('[MESSAGE-MODEL] createMessage called with:', { chatId, senderId, messageType });
 
   try {
-    const [result] = await pool.execute(
-      `INSERT INTO messages (chat_id, sender_id, message, message_type, media_url, reply_to)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [chatId, senderId, message, messageType, mediaUrl, replyTo]
-    );
+    const sql = `INSERT INTO messages (chat_id, sender_id, message, message_type, media_url, reply_to, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, NOW())`;
+    const values = [chatId, senderId, message, messageType, mediaUrl, replyTo];
 
-    console.log('[MESSAGE-MODEL] Message inserted with ID:', result.insertId);
+    console.log('[MESSAGE-MODEL] Insert SQL:', sql);
+    console.log('[MESSAGE-MODEL] Insert values:', values);
+
+    const [result] = await pool.execute(sql, values);
+
+    console.log('[MESSAGE-MODEL] Insert result:', {
+      insertId: result.insertId,
+      affectedRows: result.affectedRows,
+      warningStatus: result.warningStatus,
+    });
     return result.insertId;
   } catch (error) {
-    console.error('[MESSAGE-MODEL] Failed to create message:', error.message);
+    console.error('[MESSAGE-MODEL] Failed to create message:', {
+      message: error.message,
+      code: error.code,
+      sqlMessage: error.sqlMessage,
+      sqlState: error.sqlState,
+      sql: error.sql,
+    });
     throw error;
   }
 };
@@ -28,7 +41,7 @@ const getMessagesByChat = async (chatId, limit = 30, offset = 0) => {
     const [rows] = await pool.execute(
       `SELECT m.*, u.full_name AS sender_name, u.username AS sender_username, u.profile_image AS sender_image
        FROM messages m
-       INNER JOIN users u ON u.id = m.sender_id
+       LEFT JOIN users u ON u.id = m.sender_id
        WHERE m.chat_id = ?
        ORDER BY m.created_at DESC
        LIMIT ${safeLimit} OFFSET ${safeOffset}`,
@@ -45,7 +58,14 @@ const getMessagesByChat = async (chatId, limit = 30, offset = 0) => {
 
 const findMessageById = async (messageId) => {
   try {
-    const [rows] = await pool.execute('SELECT * FROM messages WHERE id = ? LIMIT 1', [messageId]);
+    const [rows] = await pool.execute(
+      `SELECT m.*, u.full_name AS sender_name, u.username AS sender_username, u.profile_image AS sender_image
+       FROM messages m
+       LEFT JOIN users u ON u.id = m.sender_id
+       WHERE m.id = ?
+       LIMIT 1`,
+      [messageId]
+    );
     return rows[0] || null;
   } catch (error) {
     console.error('[MESSAGE-MODEL] Failed to find message:', error.message);

@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 import * as Network from 'expo-network';
 import { getApiHost } from './api';
+import { retryPendingMessages } from './chatService';
 
 let socket;
 let networkSubscription;
@@ -23,6 +24,9 @@ const attachNetworkListener = () => {
 
     if (state.isConnected && !socket.connected) {
       socket.connect();
+      retryPendingMessages().catch((error) => {
+        console.warn('[SOCKET] Pending message retry failed', error?.message || error);
+      });
     }
   });
 };
@@ -58,6 +62,9 @@ export const connectSocket = (token) => {
 
   socket.on('connect', () => {
     console.log('[SOCKET] Connected', { id: socket.id, host });
+    retryPendingMessages().catch((error) => {
+      console.warn('[SOCKET] Pending message retry failed', error?.message || error);
+    });
   });
 
   socket.on('disconnect', (reason) => {

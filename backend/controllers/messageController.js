@@ -67,11 +67,13 @@ const getMessages = async (req, res, next) => {
  */
 const createNewMessage = async (req, res, next) => {
   try {
-    const { chatId, message = '', messageType = 'text', replyTo = null } = req.body;
+    const { chatId, message = '', messageType = 'text', replyTo = null, clientMessageId = null } = req.body;
     const senderId = req.user.id;
     const mediaUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
-    console.log('[MSG] Creating message:', { chatId, messageType, hasMean: !!message, hasFile: !!req.file });
+    console.log('[MSG] createNewMessage request body:', req.body);
+    console.log('[MSG] createNewMessage auth user:', req.user);
+    console.log('[MSG] Creating message:', { chatId, messageType, hasText: !!message, hasFile: !!req.file });
 
     if (!isValidId(chatId)) {
       console.error('[MSG] Invalid chatId:', chatId);
@@ -106,33 +108,77 @@ const createNewMessage = async (req, res, next) => {
 
     if (!messageId) {
       console.error('[MSG] Failed to create message');
-      return res.status(500).json({ message: 'Failed to create message' });
+      return res.status(500).json({ success: false, error: 'Failed to create message' });
     }
 
     const created = await findMessageById(messageId);
     if (!created) {
       console.error('[MSG] Could not retrieve created message:', messageId);
-      return res.status(500).json({ message: 'Message created but could not be retrieved' });
+      const fallbackMessage = {
+        id: messageId,
+        chat_id: Number(chatId),
+        sender_id: Number(senderId),
+        message: trimmedMessage,
+        message_type: messageType,
+        media_url: mediaUrl,
+        reply_to: replyTo,
+        created_at: new Date().toISOString(),
+        sender_name: null,
+        sender_username: null,
+        sender_image: null,
+        client_message_id: clientMessageId,
+      };
+
+      return res.status(201).json({
+        success: true,
+        message: fallbackMessage,
+      });
     }
+
+    created.client_message_id = clientMessageId;
+
+    const ioPayload = {
+      ...created,
+      client_message_id: clientMessageId,
+    };
 
     if (req.io) {
       try {
         const participants = await getChatParticipants(chatId);
         console.log('[MSG] Emitting to', participants.length, 'participants');
         participants.forEach((participant) => {
-          req.io.to(`user:${participant.id}`).emit('receive_message', created);
+          if (String(participant.id) === String(senderId)) {
+            return;
+          }
+
+          req.io.to(`user:${participant.id}`).emit('receive_message', ioPayload);
         });
+
+        req.io.to(`chat:${chatId}`).emit('message_sent', ioPayload);
       } catch (emitError) {
         console.error('[MSG] Error emitting message:', emitError.message);
       }
     }
 
     console.log('[MSG] Message created successfully:', messageId);
-    return res.status(201).json(created);
+    console.log('[MSG] SQL query result / created row:', ioPayload);
+    return res.status(201).json({
+      success: true,
+      message: ioPayload,
+    });
   } catch (error) {
-    console.error('[MSG] createNewMessage error:', error.message);
-    console.error('[MSG] Stack:', error.stack);
-    return next(error);
+    console.error('[MSG] createNewMessage error:', {
+      message: error.message,
+      code: error.code,
+      sqlMessage: error.sqlMessage,
+      sqlState: error.sqlState,
+      sql: error.sql,
+      stack: error.stack,
+    });
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
   }
 };
 

@@ -1,5 +1,7 @@
 import api from './api';
 
+const pendingMessageQueue = new Map();
+
 const extractMessagesArray = (payload) => {
   if (Array.isArray(payload)) {
     return payload;
@@ -66,11 +68,30 @@ export const fetchMessages = async (chatId, page = 0, pageSize = 30) => {
   return messages;
 };
 
-export const sendMessage = async ({ chatId, text, messageType = 'text', media }) => {
+const performSendMessage = async ({ chatId, text, messageType = 'text', media, clientMessageId }) => {
+  if (!media) {
+    const { data } = await api.post('/messages', {
+      chatId: String(chatId),
+      message: text || '',
+      messageType,
+      clientMessageId,
+    });
+
+    console.log('[CHAT-SERVICE] sendMessage response:', {
+      chatId: String(chatId),
+      id: data?.message?.id ?? data?.id ?? data?._id,
+      senderId: data?.message?.sender_id ?? data?.sender_id,
+      hasText: Boolean(data?.message?.message ?? data?.message ?? data?.text),
+    });
+
+    return data?.message && typeof data.message === 'object' ? data.message : data;
+  }
+
   const formData = new FormData();
   formData.append('chatId', String(chatId));
   formData.append('message', text || '');
   formData.append('messageType', messageType);
+  formData.append('clientMessageId', clientMessageId || '');
 
   if (media) {
     formData.append('media', {
@@ -86,12 +107,46 @@ export const sendMessage = async ({ chatId, text, messageType = 'text', media })
 
   console.log('[CHAT-SERVICE] sendMessage response:', {
     chatId: String(chatId),
-    id: data?.id ?? data?._id,
-    senderId: data?.sender_id,
-    hasText: Boolean(data?.message),
+    id: data?.message?.id ?? data?.id ?? data?._id,
+    senderId: data?.message?.sender_id ?? data?.sender_id,
+    hasText: Boolean(data?.message?.message ?? data?.message ?? data?.text),
   });
 
-  return data;
+  return data?.message && typeof data.message === 'object' ? data.message : data;
+};
+
+export const sendMessage = async (payload) => {
+  return performSendMessage(payload);
+};
+
+export const queuePendingMessage = (payload) => {
+  if (!payload?.clientMessageId) {
+    return;
+  }
+
+  pendingMessageQueue.set(String(payload.clientMessageId), payload);
+};
+
+export const clearPendingMessage = (clientMessageId) => {
+  if (!clientMessageId) {
+    return;
+  }
+
+  pendingMessageQueue.delete(String(clientMessageId));
+};
+
+export const retryPendingMessages = async () => {
+  const pendingMessages = Array.from(pendingMessageQueue.values());
+
+  for (const pending of pendingMessages) {
+    try {
+      const created = await performSendMessage(pending);
+      pendingMessageQueue.delete(String(pending.clientMessageId));
+      pending.onSuccess?.(created, pending);
+    } catch (error) {
+      pending.onFailure?.(error, pending);
+    }
+  }
 };
 
 export const markSeen = async (chatId) => {

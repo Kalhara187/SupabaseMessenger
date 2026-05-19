@@ -14,7 +14,6 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get('/:chatId', getMessages);
 router.post(
   '/',
   upload.single('media'),
@@ -26,6 +25,7 @@ router.post(
   createNewMessage
 );
 router.post('/seen', [body('chatId').notEmpty().isString()], validateRequest, seenMessage);
+router.get('/:chatId', getMessages);
 router.delete('/:id', deleteMessage);
 
 module.exports = router;

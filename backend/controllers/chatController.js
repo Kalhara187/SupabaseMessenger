@@ -57,6 +57,7 @@ const listChats = async (req, res, next) => {
           type: chat.type,
           title: chat.title,
           group_image: chat.group_image,
+          profile_image: otherParticipant?.profile_image || chat.group_image || null,
           created_at: chat.created_at,
           last_message: chat.last_message,
           last_message_time: chat.last_message_time,
@@ -213,6 +214,7 @@ const createNewChat = async (req, res, next) => {
         type: chat.type,
         title: chat.title,
         group_image: chat.group_image,
+        profile_image: chat.group_image || null,
         created_at: chat.created_at,
         participants,
       });
@@ -249,6 +251,7 @@ const createNewChat = async (req, res, next) => {
         type: 'group',
         title: String(title).trim(),
         group_image: groupImage,
+        profile_image: groupImage,
         created_at: new Date().toISOString(),
         participants,
       });

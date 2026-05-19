@@ -1,28 +1,59 @@
 import React from 'react';
-import { Pressable, View, Text } from 'react-native';
+import { Image, Pressable, View, Text } from 'react-native';
+import { getApiHost } from '../services/api';
+
+const resolveImageUri = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  return `${getApiHost()}${value.startsWith('/') ? '' : '/'}${value}`;
+};
 
 const ChatListItem = ({ chat, onPress }) => {
   const title = chat.display_name || chat.title || (chat.type === 'group' ? 'Group Chat' : `Chat #${chat.id}`);
+  const avatarUri = resolveImageUri(chat.profile_image || chat.group_image);
+  const lastMessageTime = chat.last_message_time
+    ? new Date(chat.last_message_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : 'now';
 
   return (
     <Pressable
       onPress={onPress}
       className="bg-slate-900 rounded-2xl p-4 mb-3 border border-slate-800"
     >
-      <View className="flex-row items-center justify-between">
-        <Text className="text-slate-100 font-semibold text-base">{title}</Text>
-        <Text className="text-xs text-slate-400">
-          {chat.last_message_time ? new Date(chat.last_message_time).toLocaleTimeString() : 'now'}
-        </Text>
-      </View>
-      <Text className="text-slate-400 mt-2" numberOfLines={1}>
-        {chat.last_message || 'Start the conversation'}
-      </Text>
-      {Number(chat.unread_count) > 0 ? (
-        <View className="self-end mt-2 bg-brand-500 rounded-full px-3 py-1">
-          <Text className="text-white text-xs">{chat.unread_count} unread</Text>
+      <View className="flex-row items-center gap-3">
+        <View className="h-12 w-12 rounded-full bg-slate-800 overflow-hidden items-center justify-center">
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} className="h-12 w-12" resizeMode="cover" />
+          ) : (
+            <Text className="text-slate-300 font-semibold">{title.slice(0, 1).toUpperCase()}</Text>
+          )}
         </View>
-      ) : null}
+
+        <View className="flex-1">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-slate-100 font-semibold text-base" numberOfLines={1}>
+              {title}
+            </Text>
+            <Text className="text-xs text-slate-400">{lastMessageTime}</Text>
+          </View>
+          <View className="flex-row items-center justify-between mt-1">
+            <Text className="text-slate-400 flex-1 pr-3" numberOfLines={1}>
+              {chat.last_message || 'Start the conversation'}
+            </Text>
+            {Number(chat.unread_count) > 0 ? (
+              <View className="bg-brand-500 rounded-full px-2 py-1 min-w-[28px] items-center">
+                <Text className="text-white text-xs font-semibold">{chat.unread_count}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </View>
     </Pressable>
   );
 };
