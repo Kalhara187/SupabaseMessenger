@@ -35,6 +35,18 @@ const isValidUserId = (userId) => {
   return trimmed.length > 0;
 };
 
+const buildOtherUserPayload = (participant, fallbackTitle = null) => {
+  if (!participant) {
+    return null;
+  }
+
+  return {
+    id: participant.id,
+    name: participant.full_name || participant.username || participant.email || fallbackTitle || `User ${participant.id}`,
+    avatar: participant.profile_image || null,
+  };
+};
+
 /**
  * List all chats for the logged-in user
  * GET /api/chats
@@ -50,26 +62,28 @@ const listChats = async (req, res, next) => {
       chats.map(async (chat) => {
         const participants = await getChatParticipants(chat.id);
         const otherParticipant = participants.find(p => String(p.id) !== String(userId));
+        const otherUser = buildOtherUserPayload(otherParticipant, chat.title);
+        const displayName = otherUser?.name || chat.title || `Chat ${chat.id}`;
 
         return {
           id: chat.id,
+          chat_id: chat.id,
           chatId: chat.id,
           type: chat.type,
           title: chat.title,
           group_image: chat.group_image,
           profile_image: otherParticipant?.profile_image || chat.group_image || null,
+          other_user: otherUser,
           other_participant: otherParticipant || null,
           other_participant_is_online: Boolean(otherParticipant?.is_online),
           other_participant_last_seen: otherParticipant?.last_seen || null,
           created_at: chat.created_at,
+          updated_at: chat.last_message_time || chat.created_at,
           last_message: chat.last_message,
           last_message_time: chat.last_message_time,
           unread_count: chat.unread_count || 0,
           participants,
-          display_name:
-            chat.type === 'direct'
-              ? otherParticipant?.full_name || otherParticipant?.username || 'Conversation'
-              : chat.title || 'Group Chat',
+          display_name: chat.type === 'direct' ? displayName : chat.title || 'Group Chat',
         };
       })
     );
@@ -108,16 +122,19 @@ const getChat = async (req, res, next) => {
 
     return res.json({
       id: chat.id,
+      chat_id: chat.id,
       chatId: chat.id,
       type: chat.type,
       title: chat.title,
       group_image: chat.group_image,
       created_at: chat.created_at,
+      updated_at: chat.last_message_time || chat.created_at,
       last_message: chat.last_message,
       last_message_time: chat.last_message_time,
       unread_count: chat.unread_count || 0,
       participants,
       other_participant: participants.find((participant) => String(participant.id) !== currentUserId) || null,
+      other_user: buildOtherUserPayload(participants.find((participant) => String(participant.id) !== currentUserId), chat.title),
     });
   } catch (error) {
     return next(error);
@@ -255,13 +272,16 @@ const createNewChat = async (req, res, next) => {
       const participants = await getChatParticipants(chat.id);
       return res.status(200).json({
         id: chat.id,
+        chat_id: chat.id,
         chatId: chat.id,
         type: chat.type,
         title: chat.title,
         group_image: chat.group_image,
         profile_image: chat.group_image || null,
         created_at: chat.created_at,
+        updated_at: chat.last_message_time || chat.created_at,
         participants,
+        other_user: buildOtherUserPayload(participants.find((participant) => String(participant.id) !== currentUserId), chat.title),
       });
     }
 
@@ -292,13 +312,16 @@ const createNewChat = async (req, res, next) => {
 
       return res.status(201).json({
         id: chatId,
+        chat_id: chatId,
         chatId,
         type: 'group',
         title: String(title).trim(),
         group_image: groupImage,
         profile_image: groupImage,
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         participants,
+        other_user: null,
       });
     }
   } catch (error) {

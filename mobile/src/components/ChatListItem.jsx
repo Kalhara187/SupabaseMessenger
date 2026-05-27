@@ -15,8 +15,8 @@ const resolveImageUri = (value) => {
 };
 
 const ChatListItem = ({ chat, onPress }) => {
-  const title = chat.display_name || chat.title || (chat.type === 'group' ? 'Group Chat' : `Chat #${chat.id}`);
-  const avatarUri = resolveImageUri(chat.profile_image || chat.group_image);
+  const title = chat.other_user?.name || chat.display_name || chat.title || (chat.type === 'group' ? 'Group Chat' : `Chat #${chat.id}`);
+  const avatarUri = resolveImageUri(chat.other_user?.avatar || chat.profile_image || chat.group_image);
   const lastMessageTime = chat.last_message_time
     ? new Date(chat.last_message_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : 'now';

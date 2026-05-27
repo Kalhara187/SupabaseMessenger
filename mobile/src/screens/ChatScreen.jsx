@@ -61,13 +61,38 @@ const ChatScreen = ({ route, navigation }) => {
       return participant;
     }
 
-    return chat?.other_participant || chat?.participants?.find((item) => String(item.id) !== String(user?.id ?? '')) || null;
-  }, [chat?.other_participant, chat?.participants, participant, user?.id]);
+    return chat?.other_user || chat?.other_participant || chat?.participants?.find((item) => String(item.id) !== String(user?.id ?? '')) || null;
+  }, [chat?.other_participant, chat?.other_user, chat?.participants, participant, user?.id]);
 
   useLayoutEffect(() => {
-    const title = chat?.title || chatParticipant?.full_name || chatParticipant?.username || 'Conversation';
-    navigation.setOptions({ title });
-  }, [chat?.title, chatParticipant?.full_name, chatParticipant?.username, navigation]);
+    const title = chatParticipant?.name || chatParticipant?.full_name || chatParticipant?.username || chat?.display_name || chat?.title || 'Chat';
+    const avatarUri = resolveImageUri(chatParticipant?.avatar || chatParticipant?.profile_image || chat?.profile_image || chat?.group_image);
+    const isOnline = Boolean(chatParticipant?.is_online);
+    const lastSeen = chatParticipant?.last_seen;
+
+    navigation.setOptions({
+      title: '',
+      headerTitle: () => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ width: 36, height: 36, borderRadius: 18, overflow: 'hidden', backgroundColor: '#334155', alignItems: 'center', justifyContent: 'center' }}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={{ width: 36, height: 36 }} />
+            ) : (
+              <Text style={{ color: '#E2E8F0', fontWeight: '700' }}>{title.slice(0, 1).toUpperCase()}</Text>
+            )}
+          </View>
+          <View>
+            <Text style={{ color: '#E2E8F0', fontSize: 16, fontWeight: '700' }} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={{ color: '#94A3B8', fontSize: 12 }} numberOfLines={1}>
+              {isOnline ? 'Online' : lastSeen ? `Last seen ${new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Offline'}
+            </Text>
+          </View>
+        </View>
+      ),
+    });
+  }, [chat?.display_name, chat?.group_image, chat?.profile_image, chat?.title, chatParticipant?.avatar, chatParticipant?.full_name, chatParticipant?.is_online, chatParticipant?.last_seen, chatParticipant?.name, chatParticipant?.profile_image, chatParticipant?.username, navigation]);
 
   const messages = useMemo(
     () => {
