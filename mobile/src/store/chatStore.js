@@ -64,22 +64,56 @@ const extractMessagesArray = (payload) => {
   return [];
 };
 
+const sortChatsByActivity = (chats) => {
+  return [...chats].sort((a, b) => {
+    const leftTime = new Date(a.last_message_time || a.updated_at || a.created_at || 0).getTime();
+    const rightTime = new Date(b.last_message_time || b.updated_at || b.created_at || 0).getTime();
+    return rightTime - leftTime;
+  });
+};
+
 const useChatStore = create((set) => ({
   chats: [],
   messagesByChat: {},
   onlineUsers: {},
   typingByChat: {},
-  setChats: (chats) => set({ chats }),
+  setChats: (chats) => set({ chats: sortChatsByActivity(chats || []) }),
+  upsertChat: (chat) =>
+    set((state) => {
+      if (!chat?.id) {
+        return state;
+      }
+
+      const normalizedChat = {
+        ...chat,
+        unread_count: Number(chat.unread_count || 0),
+      };
+      const existingIndex = state.chats.findIndex((item) => String(item.id) === String(chat.id));
+      const nextChats = [...state.chats];
+
+      if (existingIndex >= 0) {
+        nextChats[existingIndex] = {
+          ...nextChats[existingIndex],
+          ...normalizedChat,
+        };
+      } else {
+        nextChats.unshift(normalizedChat);
+      }
+
+      return { chats: sortChatsByActivity(nextChats) };
+    }),
   upsertChatPreview: (chatId, lastMessage) =>
     set((state) => ({
-      chats: state.chats.map((chat) =>
-        String(chat.id) === String(chatId)
-          ? {
-              ...chat,
-              last_message: lastMessage.message,
-              last_message_time: lastMessage.created_at ?? lastMessage.createdAt,
-            }
-          : chat
+      chats: sortChatsByActivity(
+        state.chats.map((chat) =>
+          String(chat.id) === String(chatId)
+            ? {
+                ...chat,
+                last_message: lastMessage.message,
+                last_message_time: lastMessage.created_at ?? lastMessage.createdAt,
+              }
+            : chat
+        )
       ),
     })),
   setMessages: (chatId, messagesPayload) =>
@@ -101,25 +135,25 @@ const useChatStore = create((set) => ({
     })),
   markChatRead: (chatId) =>
     set((state) => ({
-      chats: state.chats.map((chat) =>
+      chats: sortChatsByActivity(state.chats.map((chat) =>
         String(chat.id) === String(chatId)
           ? {
               ...chat,
               unread_count: 0,
             }
           : chat
-      ),
+      )),
     })),
   incrementUnreadCount: (chatId) =>
     set((state) => ({
-      chats: state.chats.map((chat) =>
+      chats: sortChatsByActivity(state.chats.map((chat) =>
         String(chat.id) === String(chatId)
           ? {
               ...chat,
               unread_count: Number(chat.unread_count || 0) + 1,
             }
           : chat
-      ),
+      )),
     })),
   replaceMessageByClientId: (chatId, clientMessageId, nextMessage) =>
     set((state) => {

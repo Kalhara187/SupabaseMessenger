@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import ChatListItem from '../components/ChatListItem';
 import { fetchChats } from '../services/chatService';
 import useChatStore from '../store/chatStore';
@@ -22,6 +23,12 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     loadChats();
   }, [loadChats]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadChats();
+    }, [loadChats])
+  );
 
   if (loading) {
     return (

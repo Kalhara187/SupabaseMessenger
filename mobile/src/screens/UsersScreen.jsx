@@ -53,6 +53,7 @@ const UsersScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [openingChatId, setOpeningChatId] = useState(null);
   const onlineUsers = useChatStore((state) => state.onlineUsers);
+  const upsertChat = useChatStore((state) => state.upsertChat);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -103,6 +104,15 @@ const UsersScreen = ({ navigation }) => {
         setOpeningChatId(selectedUser.id);
         const chat = await findOrCreateChat({ user1: user1Id, user2: user2Id });
 
+        if (chat) {
+          upsertChat({
+            ...chat,
+            other_participant: chat.other_participant || selectedUser,
+            display_name: selectedUser.full_name || selectedUser.username || selectedUser.email,
+            profile_image: selectedUser.profile_image || chat.profile_image || null,
+          });
+        }
+
         console.log('[USERS] Chat created/found:', { chatId: chat.id, participants: chat.participants?.length });
 
         navigation.navigate('Chat', { chat, participant: selectedUser });
@@ -113,7 +123,7 @@ const UsersScreen = ({ navigation }) => {
         setOpeningChatId(null);
       }
     },
-    [currentUser, navigation]
+    [currentUser, navigation, upsertChat]
   );
 
   if (loading) {
