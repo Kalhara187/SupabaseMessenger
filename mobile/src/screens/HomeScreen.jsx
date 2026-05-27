@@ -39,7 +39,7 @@ const HomeScreen = ({ navigation }) => {
         renderItem={({ item }) => (
           <ChatListItem
             chat={item}
-            onPress={() => navigation.navigate('Chat', { chat: item })}
+            onPress={() => navigation.navigate('Chat', { chat: item, participant: item.other_participant || null })}
           />
         )}
         refreshControl={

@@ -54,8 +54,8 @@ const AppStack = () => (
 );
 
 const AppNavigator = () => {
-  const { isHydrated, isAuthenticated, token } = useAuth();
-  useRealtimeSocket(token);
+  const { isHydrated, isAuthenticated, token, user } = useAuth();
+  useRealtimeSocket(token, user?.id);
 
   useEffect(() => {
     if (isAuthenticated) {

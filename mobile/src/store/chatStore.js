@@ -99,6 +99,28 @@ const useChatStore = create((set) => ({
         [String(chatId)]: mergeMessages(state.messagesByChat[String(chatId)] || [], [message]),
       },
     })),
+  markChatRead: (chatId) =>
+    set((state) => ({
+      chats: state.chats.map((chat) =>
+        String(chat.id) === String(chatId)
+          ? {
+              ...chat,
+              unread_count: 0,
+            }
+          : chat
+      ),
+    })),
+  incrementUnreadCount: (chatId) =>
+    set((state) => ({
+      chats: state.chats.map((chat) =>
+        String(chat.id) === String(chatId)
+          ? {
+              ...chat,
+              unread_count: Number(chat.unread_count || 0) + 1,
+            }
+          : chat
+      ),
+    })),
   replaceMessageByClientId: (chatId, clientMessageId, nextMessage) =>
     set((state) => {
       const key = String(chatId);
@@ -141,6 +163,17 @@ const useChatStore = create((set) => ({
       typingByChat: {
         ...state.typingByChat,
         [chatId]: typing ? userId : null,
+      },
+    })),
+  markMessagesSeenByUser: (chatId, seenByUserId) =>
+    set((state) => ({
+      messagesByChat: {
+        ...state.messagesByChat,
+        [String(chatId)]: (state.messagesByChat[String(chatId)] || []).map((message) =>
+          String(message?.user?._id ?? message?.sender_id ?? message?.senderId ?? '') === String(seenByUserId)
+            ? { ...message, seen: true, status: 'read' }
+            : message
+        ),
       },
     })),
 }));

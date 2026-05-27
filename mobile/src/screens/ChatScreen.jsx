@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Text, View } from 'react-native';
 import { GiftedChat, Bubble } from 'react-native-gifted-chat';
 import { useAuth } from '../context/AuthContext';
+import { getApiHost } from '../services/api';
 import useChatStore from '../store/chatStore';
 import {
   clearPendingMessage,
@@ -25,6 +26,18 @@ const mapToGiftedMessage = (item) => ({
   clientMessageId: item.client_message_id || item.clientMessageId || null,
 });
 
+const resolveImageUri = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  return `${getApiHost()}${value.startsWith('/') ? '' : '/'}${value}`;
+};
+
 const ChatScreen = ({ route, navigation }) => {
   const { chat, participant } = route.params;
   const { user } = useAuth();
@@ -35,14 +48,26 @@ const ChatScreen = ({ route, navigation }) => {
     replaceMessageByClientId,
     upsertChatPreview,
     markMessageStatus,
+    markChatRead,
+    setTyping,
   } = useChatStore();
   const [loading, setLoading] = useState(false);
   const chatId = String(chat?.id || chat?.chatId || '');
+  const typingTimerRef = useRef(null);
+  const hasActiveTypingRef = useRef(false);
+
+  const chatParticipant = useMemo(() => {
+    if (participant) {
+      return participant;
+    }
+
+    return chat?.other_participant || chat?.participants?.find((item) => String(item.id) !== String(user?.id ?? '')) || null;
+  }, [chat?.other_participant, chat?.participants, participant, user?.id]);
 
   useLayoutEffect(() => {
-    const title = chat?.title || participant?.full_name || participant?.username || 'Conversation';
+    const title = chat?.title || chatParticipant?.full_name || chatParticipant?.username || 'Conversation';
     navigation.setOptions({ title });
-  }, [chat?.title, navigation, participant?.full_name, participant?.username]);
+  }, [chat?.title, chatParticipant?.full_name, chatParticipant?.username, navigation]);
 
   const messages = useMemo(
     () => {
@@ -55,6 +80,8 @@ const ChatScreen = ({ route, navigation }) => {
   );
 
   const currentUserId = String(user?.id ?? '');
+  const typingPartnerId = useChatStore((state) => state.typingByChat[chatId]);
+  const isPartnerTyping = Boolean(typingPartnerId && String(typingPartnerId) !== currentUserId);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -67,10 +94,15 @@ const ChatScreen = ({ route, navigation }) => {
       setMessages(chatId, fetchedMessages);
 
       const socket = getSocket();
-      socket?.emit('join_chat', chatId);
+      socket?.emit('join_chat', chatId, (result) => {
+        if (!result?.ok) {
+          console.warn('[CHAT-SCREEN] Could not join chat room', result?.message || 'Unknown error');
+        }
+      });
 
       try {
         await markSeen(chatId);
+        markChatRead(chatId);
       } catch {
         // ignore seen failures while loading
       }
@@ -79,11 +111,62 @@ const ChatScreen = ({ route, navigation }) => {
     } finally {
       setLoading(false);
     }
-  }, [chatId, setMessages]);
+  }, [chatId, markChatRead, setMessages]);
 
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+      }
+
+      if (hasActiveTypingRef.current) {
+        const socket = getSocket();
+        socket?.emit('stop_typing', { chatId });
+      }
+    };
+  }, [chatId]);
+
+  const sendTypingState = useCallback(
+    (text) => {
+      const socket = getSocket();
+      if (!socket || !chatId) {
+        return;
+      }
+
+      const trimmed = String(text || '').trim();
+
+      if (!trimmed) {
+        if (hasActiveTypingRef.current) {
+          socket.emit('stop_typing', { chatId });
+          hasActiveTypingRef.current = false;
+        }
+
+        if (typingTimerRef.current) {
+          clearTimeout(typingTimerRef.current);
+        }
+        return;
+      }
+
+      if (!hasActiveTypingRef.current) {
+        socket.emit('typing', { chatId });
+        hasActiveTypingRef.current = true;
+      }
+
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+      }
+
+      typingTimerRef.current = setTimeout(() => {
+        socket.emit('stop_typing', { chatId });
+        hasActiveTypingRef.current = false;
+      }, 1200);
+    },
+    [chatId]
+  );
 
   const onSend = useCallback(
     async (newMessages = []) => {
@@ -118,6 +201,7 @@ const ChatScreen = ({ route, navigation }) => {
       };
 
       addMessage(chatId, optimisticMessage);
+      sendTypingState('');
       queuePendingMessage({
         chatId,
         text: optimisticMessage.text,
@@ -142,7 +226,7 @@ const ChatScreen = ({ route, navigation }) => {
         handlePendingFailure();
       }
     },
-    [addMessage, chatId, clearPendingMessage, currentUserId, markMessageStatus, replaceMessageByClientId, upsertChatPreview, user?.full_name, user?.profile_image, user?.username]
+    [addMessage, chatId, clearPendingMessage, currentUserId, markMessageStatus, replaceMessageByClientId, sendTypingState, upsertChatPreview, user?.full_name, user?.profile_image, user?.username]
   );
 
   const renderBubble = useCallback(
@@ -166,6 +250,26 @@ const ChatScreen = ({ route, navigation }) => {
     [chatId]
   );
 
+  const renderAvatar = useCallback(
+    (props) => {
+      const avatarUri = resolveImageUri(props?.currentMessage?.user?.avatar);
+      const initials = String(props?.currentMessage?.user?.name || 'U').slice(0, 1).toUpperCase();
+
+      return (
+        <View style={{ marginHorizontal: 8, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 30, height: 30, borderRadius: 15, overflow: 'hidden', backgroundColor: '#334155', alignItems: 'center', justifyContent: 'center' }}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={{ width: 30, height: 30 }} />
+            ) : (
+              <Text style={{ color: '#E2E8F0', fontSize: 12, fontWeight: '700' }}>{initials}</Text>
+            )}
+          </View>
+        </View>
+      );
+    },
+    []
+  );
+
   const renderTime = useCallback(
     (props) => {
       const isOwnMessage = String(props.currentMessage?.user?._id ?? '') === currentUserId;
@@ -173,18 +277,41 @@ const ChatScreen = ({ route, navigation }) => {
       const timeLabel = props.currentMessage?.createdAt
         ? new Date(props.currentMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         : '';
-      const statusLabel = status === 'sending' ? 'Sending…' : status === 'failed' ? 'Failed' : 'Sent';
+      const seen = Boolean(props.currentMessage?.seen);
+      const statusLabel = status === 'sending'
+        ? 'Sending'
+        : status === 'failed'
+          ? 'Failed'
+          : isOwnMessage
+            ? seen
+              ? 'Read'
+              : 'Delivered'
+            : '';
 
       return (
         <View style={{ alignItems: isOwnMessage ? 'flex-end' : 'flex-start', marginTop: 4 }}>
           <Text style={{ color: '#94A3B8', fontSize: 11 }}>
-            {isOwnMessage ? `${statusLabel} · ${timeLabel}` : timeLabel}
+            {isOwnMessage ? `${statusLabel}${timeLabel ? ` · ${timeLabel}` : ''}` : timeLabel}
           </Text>
         </View>
       );
     },
     [currentUserId]
   );
+
+  const renderFooter = useCallback(() => {
+    if (!isPartnerTyping) {
+      return null;
+    }
+
+    const typingName = chatParticipant?.full_name || chatParticipant?.username || 'User';
+
+    return (
+      <View style={{ paddingHorizontal: 16, paddingBottom: 6 }}>
+        <Text style={{ color: '#94A3B8', fontSize: 12 }}>{typingName} is typing...</Text>
+      </View>
+    );
+  }, [chatParticipant?.full_name, chatParticipant?.username, isPartnerTyping]);
 
   return (
     <View className="flex-1 bg-ink">
@@ -199,11 +326,16 @@ const ChatScreen = ({ route, navigation }) => {
         user={{ _id: currentUserId }}
         isLoadingEarlier={loading}
         renderBubble={renderBubble}
+        renderAvatar={renderAvatar}
         renderTime={renderTime}
+        renderFooter={renderFooter}
+        onInputTextChanged={sendTypingState}
         keyExtractor={(item) => String(item._id)}
         placeholder="Write a message"
         alwaysShowSend
         scrollToBottom
+        showUserAvatar
+        renderUsernameOnMessage
       />
     </View>
   );

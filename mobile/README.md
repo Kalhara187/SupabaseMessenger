@@ -28,6 +28,8 @@ npm run android
 - Auth flow (login, register, forgot password, logout)
 - Chat list and chat room
 - Socket.IO realtime updates
+- Users list with search, online status, and last seen
+- Private one-to-one chat with typing indicators and read receipts
 - Group creation screen
 - Search, profile, settings screens
 - Notification permission bootstrap

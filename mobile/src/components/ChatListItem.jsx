@@ -20,6 +20,15 @@ const ChatListItem = ({ chat, onPress }) => {
   const lastMessageTime = chat.last_message_time
     ? new Date(chat.last_message_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : 'now';
+  const isDirect = chat.type === 'direct';
+  const isOnline = Boolean(chat.other_participant_is_online);
+  const presenceLabel = isDirect
+    ? isOnline
+      ? 'Online'
+      : chat.other_participant_last_seen
+        ? `Last seen ${new Date(chat.other_participant_last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+        : 'Offline'
+    : 'Group chat';
 
   return (
     <Pressable
@@ -41,6 +50,12 @@ const ChatListItem = ({ chat, onPress }) => {
               {title}
             </Text>
             <Text className="text-xs text-slate-400">{lastMessageTime}</Text>
+          </View>
+          <View className="flex-row items-center mt-1">
+            <View className={`h-2 w-2 rounded-full mr-2 ${isDirect && isOnline ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+            <Text className="text-xs text-slate-400" numberOfLines={1}>
+              {presenceLabel}
+            </Text>
           </View>
           <View className="flex-row items-center justify-between mt-1">
             <Text className="text-slate-400 flex-1 pr-3" numberOfLines={1}>
