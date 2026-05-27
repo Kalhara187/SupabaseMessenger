@@ -42,7 +42,8 @@ const buildOtherUserPayload = (participant, fallbackTitle = null) => {
 
   return {
     id: participant.id,
-    name: participant.full_name || participant.username || participant.email || fallbackTitle || `User ${participant.id}`,
+    username: participant.username || participant.full_name || participant.email || fallbackTitle || `User ${participant.id}`,
+    name: participant.username || participant.full_name || participant.email || fallbackTitle || `User ${participant.id}`,
     avatar: participant.profile_image || null,
   };
 };

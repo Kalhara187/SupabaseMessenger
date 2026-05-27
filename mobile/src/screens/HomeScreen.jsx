@@ -60,7 +60,7 @@ const HomeScreen = ({ navigation }) => {
           />
         }
         ListEmptyComponent={
-          <Text className="text-slate-300 text-center mt-10">No chats yet. Start your first conversation.</Text>
+          <Text className="text-slate-300 text-center mt-10">No chats yet. Start a chat from the Users page.</Text>
         }
         showsVerticalScrollIndicator={false}
       />

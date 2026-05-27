@@ -15,7 +15,9 @@ const resolveImageUri = (value) => {
 };
 
 const ChatListItem = ({ chat, onPress }) => {
-  const title = chat.other_user?.name || chat.display_name || chat.title || (chat.type === 'group' ? 'Group Chat' : `Chat #${chat.id}`);
+  const title = chat.type === 'direct'
+    ? chat.other_user?.username || chat.other_user?.name || ''
+    : chat.title || 'Group Chat';
   const avatarUri = resolveImageUri(chat.other_user?.avatar || chat.profile_image || chat.group_image);
   const lastMessageTime = chat.last_message_time
     ? new Date(chat.last_message_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -59,7 +61,7 @@ const ChatListItem = ({ chat, onPress }) => {
           </View>
           <View className="flex-row items-center justify-between mt-1">
             <Text className="text-slate-400 flex-1 pr-3" numberOfLines={1}>
-              {chat.last_message || 'Start the conversation'}
+              {chat.last_message || 'No messages yet'}
             </Text>
             {Number(chat.unread_count) > 0 ? (
               <View className="bg-brand-500 rounded-full px-2 py-1 min-w-[28px] items-center">

@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
 import { GiftedChat, Bubble } from 'react-native-gifted-chat';
 import { useAuth } from '../context/AuthContext';
 import { getApiHost } from '../services/api';
@@ -64,35 +64,13 @@ const ChatScreen = ({ route, navigation }) => {
     return chat?.other_user || chat?.other_participant || chat?.participants?.find((item) => String(item.id) !== String(user?.id ?? '')) || null;
   }, [chat?.other_participant, chat?.other_user, chat?.participants, participant, user?.id]);
 
-  useLayoutEffect(() => {
-    const title = chatParticipant?.name || chatParticipant?.full_name || chatParticipant?.username || chat?.display_name || chat?.title || 'Chat';
-    const avatarUri = resolveImageUri(chatParticipant?.avatar || chatParticipant?.profile_image || chat?.profile_image || chat?.group_image);
-    const isOnline = Boolean(chatParticipant?.is_online);
-    const lastSeen = chatParticipant?.last_seen;
-
-    navigation.setOptions({
-      title: '',
-      headerTitle: () => (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ width: 36, height: 36, borderRadius: 18, overflow: 'hidden', backgroundColor: '#334155', alignItems: 'center', justifyContent: 'center' }}>
-            {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={{ width: 36, height: 36 }} />
-            ) : (
-              <Text style={{ color: '#E2E8F0', fontWeight: '700' }}>{title.slice(0, 1).toUpperCase()}</Text>
-            )}
-          </View>
-          <View>
-            <Text style={{ color: '#E2E8F0', fontSize: 16, fontWeight: '700' }} numberOfLines={1}>
-              {title}
-            </Text>
-            <Text style={{ color: '#94A3B8', fontSize: 12 }} numberOfLines={1}>
-              {isOnline ? 'Online' : lastSeen ? `Last seen ${new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Offline'}
-            </Text>
-          </View>
-        </View>
-      ),
-    });
-  }, [chat?.display_name, chat?.group_image, chat?.profile_image, chat?.title, chatParticipant?.avatar, chatParticipant?.full_name, chatParticipant?.is_online, chatParticipant?.last_seen, chatParticipant?.name, chatParticipant?.profile_image, chatParticipant?.username, navigation]);
+  const chatDisplayName = chatParticipant?.username || chatParticipant?.name || chatParticipant?.full_name || chat?.display_name || chat?.title || 'Chat';
+  const chatAvatarUri = resolveImageUri(chatParticipant?.avatar || chatParticipant?.profile_image || chat?.profile_image || chat?.group_image);
+  const chatPresenceLabel = chatParticipant?.is_online
+    ? 'Online'
+    : chatParticipant?.last_seen
+      ? `Last seen ${new Date(chatParticipant.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      : 'Offline';
 
   const messages = useMemo(
     () => {
@@ -340,6 +318,27 @@ const ChatScreen = ({ route, navigation }) => {
 
   return (
     <View className="flex-1 bg-ink">
+      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#1E293B', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#E2E8F0', fontSize: 18, fontWeight: '700' }}>‹</Text>
+        </Pressable>
+        <View style={{ width: 40, height: 40, borderRadius: 20, overflow: 'hidden', backgroundColor: '#334155', alignItems: 'center', justifyContent: 'center' }}>
+          {chatAvatarUri ? (
+            <Image source={{ uri: chatAvatarUri }} style={{ width: 40, height: 40 }} />
+          ) : (
+            <Text style={{ color: '#E2E8F0', fontWeight: '700' }}>{chatDisplayName.slice(0, 1).toUpperCase()}</Text>
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#E2E8F0', fontSize: 16, fontWeight: '700' }} numberOfLines={1}>
+            {chatDisplayName}
+          </Text>
+          <Text style={{ color: '#94A3B8', fontSize: 12 }} numberOfLines={1}>
+            {chatPresenceLabel}
+          </Text>
+        </View>
+      </View>
+
       {loading && messages.length === 0 ? (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
           <ActivityIndicator size="large" color="#1DAA61" />

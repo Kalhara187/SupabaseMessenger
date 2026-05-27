@@ -48,7 +48,7 @@ const AuthStack = () => (
 const AppStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="HomeTabs" component={MainTabs} options={{ headerShown: false }} />
-    <Stack.Screen name="Chat" component={ChatScreen} options={{ title: 'Conversation' }} />
+    <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
     <Stack.Screen name="GroupManagement" component={GroupManagementScreen} />
   </Stack.Navigator>
 );
