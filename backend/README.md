@@ -34,6 +34,7 @@ The server binds to `0.0.0.0` and logs the detected LAN IPs plus the health chec
 - GET `/api/auth/profile`
 - POST `/api/auth/forgot-password`
 - GET `/api/chats`
+- GET `/api/chats/:id`
 - POST `/api/chats`
 - GET `/api/messages/:chatId`
 - POST `/api/messages`
@@ -54,6 +55,8 @@ The server binds to `0.0.0.0` and logs the detected LAN IPs plus the health chec
 - `message_seen`
 - `user_online`
 - `user_offline`
+
+Private direct chats are constrained to their two participants on both the HTTP and Socket.IO paths. The backend emits message, typing, and read-receipt events to user-specific rooms so other users cannot subscribe to a conversation they do not belong to.
 
 ## Mobile Networking
 

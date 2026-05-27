@@ -1,9 +1,22 @@
 const jwt = require('jsonwebtoken');
 const { updateOnlineStatus } = require('../models/userModel');
+const { getChatParticipants, isUserInChat } = require('../models/chatModel');
 
 const socketToUserMap = new Map();
 
 const configureSocket = (io) => {
+  const emitToChatParticipants = async (chatId, eventName, payload, excludeUserId = null) => {
+    const participants = await getChatParticipants(chatId);
+
+    participants.forEach((participant) => {
+      if (excludeUserId && String(participant.id) === String(excludeUserId)) {
+        return;
+      }
+
+      io.to(`user:${participant.id}`).emit(eventName, payload);
+    });
+  };
+
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
     if (!token) {
@@ -27,24 +40,72 @@ const configureSocket = (io) => {
     await updateOnlineStatus(userId, true);
     io.emit('user_online', { userId });
 
-    socket.on('send_message', (payload) => {
-      io.to(`chat:${payload.chatId}`).emit('receive_message', payload);
+    socket.on('join_chat', async (chatId, ack) => {
+      try {
+        if (!chatId) {
+          ack?.({ ok: false, message: 'chatId is required' });
+          return;
+        }
+
+        const allowed = await isUserInChat(chatId, userId);
+        if (!allowed) {
+          ack?.({ ok: false, message: 'Forbidden' });
+          return;
+        }
+
+        socket.join(`chat:${chatId}`);
+        ack?.({ ok: true });
+      } catch (error) {
+        ack?.({ ok: false, message: error.message || 'Failed to join chat' });
+      }
     });
 
-    socket.on('join_chat', (chatId) => {
-      socket.join(`chat:${chatId}`);
+    socket.on('send_message', async (payload) => {
+      if (!payload?.chatId) {
+        return;
+      }
+
+      try {
+        await emitToChatParticipants(payload.chatId, 'receive_message', payload, userId);
+      } catch (error) {
+        console.error('[SOCKET] Failed to forward message:', error.message);
+      }
     });
 
-    socket.on('typing', ({ chatId }) => {
-      socket.to(`chat:${chatId}`).emit('typing', { chatId, userId });
+    socket.on('typing', async ({ chatId }) => {
+      if (!chatId) {
+        return;
+      }
+
+      try {
+        await emitToChatParticipants(chatId, 'typing', { chatId, userId }, userId);
+      } catch (error) {
+        console.error('[SOCKET] Failed to forward typing state:', error.message);
+      }
     });
 
-    socket.on('stop_typing', ({ chatId }) => {
-      socket.to(`chat:${chatId}`).emit('stop_typing', { chatId, userId });
+    socket.on('stop_typing', async ({ chatId }) => {
+      if (!chatId) {
+        return;
+      }
+
+      try {
+        await emitToChatParticipants(chatId, 'stop_typing', { chatId, userId }, userId);
+      } catch (error) {
+        console.error('[SOCKET] Failed to forward typing stop:', error.message);
+      }
     });
 
-    socket.on('message_seen', ({ chatId }) => {
-      socket.to(`chat:${chatId}`).emit('message_seen', { chatId, userId });
+    socket.on('message_seen', async ({ chatId }) => {
+      if (!chatId) {
+        return;
+      }
+
+      try {
+        await emitToChatParticipants(chatId, 'message_seen', { chatId, userId }, userId);
+      } catch (error) {
+        console.error('[SOCKET] Failed to forward seen state:', error.message);
+      }
     });
 
     socket.on('disconnect', async () => {

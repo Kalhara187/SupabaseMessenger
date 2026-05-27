@@ -113,15 +113,19 @@ const updateProfile = async (id, payload) => {
   return findUserById(id);
 };
 
-const listUsers = async (query) => {
-  const rows = await supabaseRequest('users?select=id,full_name,username,email,profile_image,bio,is_online,last_seen,created_at&order=full_name.asc&limit=100');
+const listUsers = async (query, excludeUserId = null) => {
+  const rows = await supabaseRequest('users?select=id,full_name,username,email,profile_image,bio,is_online,last_seen,created_at&order=is_online.desc,full_name.asc&limit=100');
+
+  const filteredRows = excludeUserId
+    ? (rows || []).filter((item) => String(item.id) !== String(excludeUserId))
+    : (rows || []);
 
   if (!query) {
-    return rows || [];
+    return filteredRows;
   }
 
   const search = query.toLowerCase();
-  return (rows || []).filter((item) => {
+  return filteredRows.filter((item) => {
     const fullName = String(item.full_name || '').toLowerCase();
     const username = String(item.username || '').toLowerCase();
     const email = String(item.email || '').toLowerCase();

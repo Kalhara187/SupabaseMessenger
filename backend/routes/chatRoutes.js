@@ -1,6 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { listChats, findOrCreateChat, createNewChat } = require('../controllers/chatController');
+const { listChats, getChat, findOrCreateChat, createNewChat } = require('../controllers/chatController');
 const authMiddleware = require('../middleware/authMiddleware');
 const validateRequest = require('../middleware/validateRequest');
 const upload = require('../middleware/uploadMiddleware');
@@ -11,6 +11,7 @@ router.use(authMiddleware);
 
 router.get('/', listChats);
 router.get('/find-or-create', findOrCreateChat);
+router.get('/:id', getChat);
 router.post(
   '/',
   upload.single('groupImage'),

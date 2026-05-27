@@ -58,6 +58,9 @@ const listChats = async (req, res, next) => {
           title: chat.title,
           group_image: chat.group_image,
           profile_image: otherParticipant?.profile_image || chat.group_image || null,
+          other_participant: otherParticipant || null,
+          other_participant_is_online: Boolean(otherParticipant?.is_online),
+          other_participant_last_seen: otherParticipant?.last_seen || null,
           created_at: chat.created_at,
           last_message: chat.last_message,
           last_message_time: chat.last_message_time,
@@ -75,6 +78,48 @@ const listChats = async (req, res, next) => {
     return res.json(enriched);
   } catch (error) {
     console.error('[CHAT] listChats error:', error.message);
+    return next(error);
+  }
+};
+
+/**
+ * Get a single chat the current user belongs to
+ * GET /api/chats/:id
+ */
+const getChat = async (req, res, next) => {
+  try {
+    const chatId = req.params.id;
+    const currentUserId = String(req.user.id);
+
+    if (!isValidUserId(chatId)) {
+      return res.status(400).json({ message: 'Chat ID is required' });
+    }
+
+    const chat = await getChatById(chatId);
+    if (!chat) {
+      return res.status(404).json({ message: 'Chat not found' });
+    }
+
+    const participants = await getChatParticipants(chat.id);
+    const isMember = participants.some((participant) => String(participant.id) === currentUserId);
+    if (!isMember) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    return res.json({
+      id: chat.id,
+      chatId: chat.id,
+      type: chat.type,
+      title: chat.title,
+      group_image: chat.group_image,
+      created_at: chat.created_at,
+      last_message: chat.last_message,
+      last_message_time: chat.last_message_time,
+      unread_count: chat.unread_count || 0,
+      participants,
+      other_participant: participants.find((participant) => String(participant.id) !== currentUserId) || null,
+    });
+  } catch (error) {
     return next(error);
   }
 };
@@ -265,6 +310,7 @@ const createNewChat = async (req, res, next) => {
 
 module.exports = {
   listChats,
+  getChat,
   findOrCreateChat,
   createNewChat,
 };

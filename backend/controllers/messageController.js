@@ -147,10 +147,6 @@ const createNewMessage = async (req, res, next) => {
         const participants = await getChatParticipants(chatId);
         console.log('[MSG] Emitting to', participants.length, 'participants');
         participants.forEach((participant) => {
-          if (String(participant.id) === String(senderId)) {
-            return;
-          }
-
           req.io.to(`user:${participant.id}`).emit('receive_message', ioPayload);
         });
 
@@ -242,6 +238,15 @@ const seenMessage = async (req, res, next) => {
 
     if (req.io) {
       try {
+        const participants = await getChatParticipants(chatId);
+        participants.forEach((participant) => {
+          if (String(participant.id) === String(userId)) {
+            return;
+          }
+
+          req.io.to(`user:${participant.id}`).emit('message_seen', { chatId, userId });
+        });
+
         req.io.to(`chat:${chatId}`).emit('message_seen', { chatId, userId });
       } catch (emitError) {
         console.error('[MSG] Error emitting seen event:', emitError.message);

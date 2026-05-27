@@ -2,7 +2,8 @@ const { findUserById, updateProfile, listUsers } = require('../models/userModel'
 
 const getUsers = async (req, res, next) => {
   try {
-    const users = await listUsers(req.query.q || '');
+    const excludeSelf = String(req.query.excludeSelf || 'true').toLowerCase() !== 'false';
+    const users = await listUsers(req.query.q || '', excludeSelf ? req.user.id : null);
     return res.json(users);
   } catch (error) {
     return next(error);
