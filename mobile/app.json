@@ -22,11 +22,16 @@
       "package": "com.sqlrealtime.messenger",
       "usesCleartextTraffic": true,
       "permissions": [
-        "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
-    "extra": {},
+    "extra": {
+      "eas": {
+        "projectId": "f93e4a9a-9975-4778-b7cd-91ea9d597b52"
+      }
+    },
     "plugins": [
       "expo-notifications",
       "expo-image-picker"

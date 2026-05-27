@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start:mobile": "cd mobile && npx expo start",
-    "start": "npm run start:mobile"
+    "start": "npm run start:mobile",
+    "build:android:apk": "cd mobile && eas build -p android --profile preview"
   }
 }

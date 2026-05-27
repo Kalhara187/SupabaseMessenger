@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "3684a48c-80b7-4a20-8bc6-0c5509c549d0"
+      }
+    },
+    "android": {
+      "package": "com.kalhara187.supabasemessenger"
+    }
+  }
+}
